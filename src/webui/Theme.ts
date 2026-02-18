@@ -11,6 +11,9 @@ function updateCss(colors: Colors): void {
 .cm-debugging {
 	background-color: ${colors.bgorange};
 }
+.theme-bg-debugging {
+	background-color: ${colors.bgorange};
+}
 .cm-tooltip-lint {
 	color: ${colors.base5};
 	background-color: ${colors.base0};
@@ -33,6 +36,9 @@ function updateCss(colors: Colors): void {
 }
 .theme-fg {
 	color: ${colors.base4};
+}
+.theme-fg-invert {
+	color: ${colors.base0};
 }
 .theme-fg2 {
 	color: ${colors.base3};

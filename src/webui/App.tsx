@@ -68,7 +68,6 @@ const App: Component = () => {
 	});
 	return (
 		<div class="fullsize flex flex-row overflow-hidden">
-			{/* ===== LEFT: Editor + Toolbar ===== */}
 			<PaneResize firstSize={0.5} direction="horizontal" second={true}>
 				{() =>
 					<div class="flex flex-col h-full w-full">
@@ -79,6 +78,7 @@ const App: Component = () => {
 								{() => <PaneResize firstSize={0.85} direction="vertical"
 									second={((wasmRuntime && (wasmRuntime.status == "debug" || wasmRuntime.status == "error")) && wasmRuntime.shadowStack.length > 0) ? wasmRuntime : null}>
 									{() => <Editor origText={origText} storeText={text => localStorage.setItem(localStorageKey, text)} asmLinterOn={wasmRuntime.status != "debug" && wasmRuntime.status != "error"}
+										editorBlockedMsg={wasmRuntime.status == "debug" ? "Debugging mode, exit it to edit text." : undefined}
 										highlightedLine={(wasmRuntime.status == "debug" || wasmRuntime.status == "error") ? getCurrentLine(wasmRuntime) : undefined}
 										editorInterfaceRef={editorInterface} setBreakpoints={setBreakpointLines}
 										diagnostics={wasmRuntime.status == "asmerr" ? { line: wasmRuntime.line, message: wasmRuntime.message } : undefined}
@@ -93,7 +93,6 @@ const App: Component = () => {
 					</div>
 				}
 
-				{/* ===== RIGHT: Memory + Registers + Console ===== */}
 				{() => <PaneResize firstSize={0.75} direction="vertical" second={true}>
 					{() => <PaneResize firstSize={0.55} direction="horizontal" second={true}>
 						{() => <MemoryView version={() => wasmRuntime.version}
@@ -107,7 +106,7 @@ const App: Component = () => {
 						/>}
 						{() => <RegisterTable pc={(wasmRuntime.status == "idle" || wasmRuntime.status == "asmerr" || wasmRuntime.status == "testsuite") ? TEXT_BASE : wasmRuntime.pc}
 							regs={(wasmRuntime.status == "idle" || wasmRuntime.status == "asmerr" || wasmRuntime.status == "testsuite") ? initialRegs : wasmRuntime.regs}
-							regWritten={wasmInterface.regWritten ? wasmInterface.regWritten[0] : 0} />}
+							regWritten={wasmInterface ? wasmInterface.regWritten[0] : 0} />}
 					</PaneResize>}
 					{() => (<div
 						innerText={consoleText(wasmRuntime) ? consoleText(wasmRuntime) : "Console output will go here..."}

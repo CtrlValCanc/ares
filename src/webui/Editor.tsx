@@ -4,15 +4,13 @@ import { forceLinting } from "@codemirror/lint";
 import { Compartment, EditorState } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
 import { EditorView, basicSetup } from "codemirror";
-import { Component, createEffect, createMemo, onCleanup, onMount } from "solid-js";
+import { Component, createEffect, createMemo, onCleanup, onMount, Show } from "solid-js";
 import { createAsmLinter } from "./AssemblerErrors";
 import { breakpointGutter } from "./Breakpoint";
 import { Theme } from "./GithubTheme";
 import { lineHighlightEffect, lineHighlightState } from "./LineHighlight";
 import { riscvLanguage } from "./RiscVLanguage";
 import { headerDecoration } from "./TestSuite";
-
-const lintCompartment = new Compartment();
 
 // we cannot use naive setText for every keystroke, that would be too inefficient for larger files
 // so we need to return a getText getter from Editor
@@ -32,6 +30,7 @@ export class EditorInterface {
 type EditorProps = {
     origText: string,
     asmLinterOn: boolean,
+    editorBlockedMsg?: string,
     highlightedLine?: number
     diagnostics?: { line: number, message: string },
     theme: Theme,
@@ -46,6 +45,8 @@ export const Editor: Component<EditorProps> = props => {
     let editor: HTMLDivElement | undefined;
     let view: EditorView;
     let cmTheme: Compartment = new Compartment();
+    let readOnlyCompartment: Compartment = new Compartment();
+    let lintCompartment = new Compartment();
     // enable and disable linter based on debugMode() and hasError()
     const getDiagnostics = createMemo(() => props.diagnostics);
     const asmLinter = createAsmLinter(props.doBuild, getDiagnostics);
@@ -62,6 +63,7 @@ export const Editor: Component<EditorProps> = props => {
                 tabKeymap,
                 new LanguageSupport(riscvLanguage, [dummyIndent]),
                 lintCompartment.of(asmLinter),
+                readOnlyCompartment.of(EditorState.readOnly.of(false)),
                 breakpointGutter(props.setBreakpoints), // must be first so it's the first gutter
                 basicSetup,
                 theme,
@@ -99,6 +101,13 @@ export const Editor: Component<EditorProps> = props => {
             view.dispatch({ effects: cmTheme.reconfigure(props.theme.cmTheme) });
         });
 
+        createEffect(() => {
+            view.dispatch({
+                effects: readOnlyCompartment.reconfigure(
+                    EditorState.readOnly.of(props.editorBlockedMsg !== undefined)
+                ),
+            });
+        });
 
         createEffect(() => {
             const _ = props.diagnostics;
@@ -129,9 +138,18 @@ export const Editor: Component<EditorProps> = props => {
         });
     });
 
-    return <main
-        class="w-full h-full overflow-hidden theme-scrollbar" style={{ contain: "strict" }}
-        ref={editor} />;
+    return <div class="flex flex-col h-full">
+        <div class="flex-1 overflow-hidden">
+            <main
+                class="w-full h-full overflow-hidden theme-scrollbar" style={{ contain: "strict" }}
+                ref={editor} />
+        </div>
+        <Show when={props.editorBlockedMsg}>
+            <div class="font-semibold text-sm pl-2 py-1 flex items-center gap-2 theme-bg-debugging ">
+                <span>{props.editorBlockedMsg}</span>
+            </div>
+        </Show>
+    </div>
 }
 
 const dummyIndent = indentService.of((context, pos) => {
