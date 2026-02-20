@@ -26,7 +26,7 @@ const BacktraceCall: Component<{ name: string, args: number[], sp: number }> = (
 
 
 export const BacktraceView = (state: DebugState | ErrorState) => {
-    return <div class="w-full h-full font-mono text-sm overflow-auto theme-scrollbar-slim flex flex-col">
+    return <div class="w-full h-full theme-mono text-sm overflow-auto theme-scrollbar-slim flex flex-col">
         {[...state.shadowStack].reverse().map(ent => <BacktraceCall name={ent.name} args={ent.args} sp={ent.sp} />)}
     </div>;
 };

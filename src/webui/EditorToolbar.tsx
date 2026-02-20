@@ -9,12 +9,10 @@ export const EditorToolbar: Component<{ textGetter: () => string, setText: (s: s
     return (
         <div class="flex flex-col">
             <div class="flex-none flex border-b theme-border h-9 pr-1">
-                <h1 class="select-none text-lg font-bold tracking-wide ml-2 mr-3 flex content-center" style={{
-                    "text-transform": "uppercase",
-                    "display": "inline-block",
-                    "line-height": 1,
-                }}>ARES</h1>
-
+                <h1 class="select-none text-lg font-bold tracking-wide ml-2 mr-3 pl-2 uppercase"
+                    style="line-height: 2.25rem; margin: 0;">
+                    ARES
+                </h1>
                 <div class="flex-grow"></div>
 
                 <div class="flex items-center gap-0.5">

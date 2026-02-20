@@ -145,7 +145,7 @@ export const Editor: Component<EditorProps> = props => {
     });
 
     return <main
-        class="w-full h-full overflow-hidden theme-scrollbar" style={{ contain: "strict" }}
+        class="w-full h-full overflow-hidden theme-scrollbar"
         ref={editor} />
 
 }

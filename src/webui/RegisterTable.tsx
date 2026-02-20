@@ -39,7 +39,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
   // round to 20ch so it has some padding between regname and hex
   // now i have the precise size in a font-independent format, as long as it's monospace
   return (
-    <div class="overflow-hidden flex-grow h-full self-start flex-shrink flex flex-col" style={{contain: "strict"}}>
+    <div class="overflow-hidden flex-grow h-full self-start flex-shrink flex flex-col">
       <div class="flex-none flex items-center justify-end theme-gutter border-b theme-border h-9">
         <div class="flex items-center gap-1">
           <select
@@ -66,7 +66,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
       </div>
 
       {/* Register grid */}
-      <div class="overflow-auto flex-grow text-md font-mono theme-scrollbar-slim theme-border">
+      <div class="overflow-auto flex-grow text-md theme-mono theme-scrollbar-slim theme-border">
         <div class="ml-[-1px] grid-cols-[repeat(auto-fit,minmax(20ch,1fr))] grid">
           <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] ">
             <div class="self-center pl-[1ch] font-bold">pc</div>

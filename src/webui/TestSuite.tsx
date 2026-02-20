@@ -106,10 +106,10 @@ export const TestSuiteViewer: Component<{ table: TestSuiteTableEntry[], currentD
             <table class="table w-full max-w-full h-full min-w-full border-collapse rounded-lg ">
                 <thead class=" ">
                     <tr class="  text-left theme-fg border-b theme-border">
-                        <th class="w-[8ch] font-mono px-2 py-1 font-semibold theme-fg">status</th>
-                        <th class="w-[14ch] font-mono px-2 py-1 font-semibold theme-fg">input</th>
-                        <th class="w-[8ch] font-mono px-2 py-1 font-semibold theme-fg whitespace-nowrap">expected</th>
-                        <th class="w-[14ch] font-mono px-2 py-1 font-semibold theme-fg whitespace-nowrap">yours</th>
+                        <th class="w-[8ch] theme-mono px-2 py-1 font-semibold theme-fg">status</th>
+                        <th class="w-[14ch] theme-mono px-2 py-1 font-semibold theme-fg">input</th>
+                        <th class="w-[8ch] theme-mono px-2 py-1 font-semibold theme-fg whitespace-nowrap">expected</th>
+                        <th class="w-[14ch] theme-mono px-2 py-1 font-semibold theme-fg whitespace-nowrap">yours</th>
                     </tr>
                 </thead>
                 <tbody class=" ">
@@ -118,7 +118,7 @@ export const TestSuiteViewer: Component<{ table: TestSuiteTableEntry[], currentD
                         const errorType = testcase.runErr ? "crashed" : "mismatched";
                         return (
                             <tr
-                                class={`  border-b font-mono theme-border ${passed ? 'theme-testsuccess' : 'theme-testfail'}`}
+                                class={`  border-b theme-mono theme-border ${passed ? 'theme-testsuccess' : 'theme-testfail'}`}
                             >
                                 <td class="px-2">
                                     {passed ?
@@ -136,17 +136,17 @@ export const TestSuiteViewer: Component<{ table: TestSuiteTableEntry[], currentD
                                         </div>}
                                 </td>
                                 <td class="px-1 py-1.5 text-sm">
-                                    <code class="text-xs font-mono rounded whitespace-pre-wrap break-words max-w-full block">
+                                    <code class="text-xs theme-mono rounded whitespace-pre-wrap break-words max-w-full block">
                                         {testcase.input}
                                     </code>
                                 </td>
                                 <td class="px-1 py-1.5 text-sm">
-                                    <code class="px-1 py-1.5 rounded text-xs font-mono whitespace-pre-wrap break-words max-w-full block">
+                                    <code class="px-1 py-1.5 rounded text-xs theme-mono whitespace-pre-wrap break-words max-w-full block">
                                         {testcase.output}
                                     </code>
                                 </td>
                                 <td class="px-1 py-1.5 text-sm">
-                                    <code class={`px-1 py-1.5 rounded text-xs font-mono whitespace-pre-wrap break-words max-w-full block `}>
+                                    <code class={`px-1 py-1.5 rounded text-xs theme-mono whitespace-pre-wrap break-words max-w-full block `}>
                                         {testcase.userOutput}
                                     </code>
                                 </td>

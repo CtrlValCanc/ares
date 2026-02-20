@@ -124,12 +124,12 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
     };
 
     return (
-        <div class="h-full flex flex-col overflow-hidden" style={{ contain: "strict" }} onMouseDown={() => setAddrSelect(-1)}>
+        <div class="h-full flex flex-col overflow-hidden" onMouseDown={() => setAddrSelect(-1)}>
             <TabSelector tab={activeTab()} setTab={setActiveTab} tabs={[".text", "disasm", ".data", "stack", "frames"]} />
 
             {/* Table Headers */}
             <Show when={activeTab() != "frames"}>
-                <div class="font-mono ml-2 theme-fg2">
+                <div class="theme-mono ml-2 theme-fg2">
                     <a class="inline-block" style={{ width: charWidth() * 10 + "px"}}>addr</a>
                     <a>{activeTab() == "disasm" ? "instructions" : "data"}</a>
                 </div>
@@ -151,7 +151,7 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
                 </Show>
             </Portal>
 
-            <div ref={parentRef} class="font-mono text-lg overflow-y-auto overflow-x-hidden theme-scrollbar ml-2">
+            <div ref={parentRef} class="theme-mono text-lg overflow-y-auto overflow-x-hidden theme-scrollbar ml-2">
                 <div ref={dummyChar} class="invisible absolute">0</div>
 
                 <Show when={activeTab() == "frames"}>

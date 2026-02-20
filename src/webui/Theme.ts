@@ -14,10 +14,19 @@ function updateCss(colors: Colors): void {
 .theme-bg-debugging {
 	background-color: ${colors.bgorange0};
 }
+.theme-mono {
+    font-family: "Consolas", "Lucida Console", "Courier New", monospace;
+}
+.cm-editor .cm-content  {
+    font-family: "Consolas", "Lucida Console", "Courier New", monospace;
+}
+.cm-gutterElement   {
+    font-family: "Consolas", "Lucida Console", "Courier New", monospace;
+}
 .cm-tooltip-lint {
 	color: ${colors.base5};
 	background-color: ${colors.base0};
-	font-family: monospace;
+    font-family: "Consolas", "Lucida Console", "Courier New", monospace;
 }
 .cm-breakpoint-marker {
 	background-color: ${colors.red};

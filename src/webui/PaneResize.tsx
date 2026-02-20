@@ -77,7 +77,6 @@ export const PaneResize = <T,>(props: {
     return (
         <div
             class="flex w-full h-full max-h-full max-w-full theme-fg theme-bg"
-            style={{ contain: "strict" }}
             ref={el => container = el}
             classList={{
                 "flex-col": props.direction === "vertical",
@@ -87,7 +86,6 @@ export const PaneResize = <T,>(props: {
             <div
                 class="theme-bg theme-fg flex-shrink overflow-hidden"
                 style={{
-                    contain: "strict",
                     height: props.direction === "vertical" ? `${props.second !== null ? size() : containerSize()}px` : "auto",
                     "min-height": props.direction === "vertical" ? `${props.second !== null ? size() : containerSize()}px` : "auto",
                     width: props.direction === "horizontal" ? `${props.second !== null ? size() : containerSize()}px` : "auto",
@@ -114,7 +112,7 @@ export const PaneResize = <T,>(props: {
                         : "absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 border-l theme-border"
                 }></div>
             </div>
-            <div style={{ contain: "strict" }} class={props.second === null ? "hidden" : "theme-bg theme-fg flex-grow flex-shrink overflow-hidden"}>
+            <div class={props.second === null ? "hidden" : "theme-bg theme-fg flex-grow flex-shrink overflow-hidden"}>
                 <Show when={props.second}>{(s) => props.children[1](s())}</Show>
             </div>
         </div>
