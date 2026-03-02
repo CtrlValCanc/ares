@@ -7,6 +7,15 @@ import { displayFormat, formatMemoryValue, unitSize, getCellWidthChars } from ".
 
 const ROW_HEIGHT: number = 24;
 
+// this wrapper is needed because the .data section size may be unaligned
+function loadWrapper(load: (addr: number, pow: number) => number, ptr: number, size: number) {
+    let val = 0;
+    for (let i = 0; i < size; i++) {
+        val |= load(ptr + i, 1) << (i * 8);
+    }
+    return val;
+}
+
 export const MemoryView: Component<{ version: () => any, writeAddr: number, writeLen: number, pc: number, sp: number, fp: number, load: (addr: number, pow: number) => number, disassemble: (pc: number) => string | null }> = (props) => {
     let parentRef: HTMLDivElement | undefined;
     let dummyChar: HTMLDivElement | undefined;
@@ -230,7 +239,8 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
                                                 else if (isFp) style = "fp-highlight";
                                                 // Use max width for consistent layout
                                                 const cellWidth = getCellWidthChars(bytesPerUnit);
-                                                const str = formatMemoryValue(props.load(ptr, bytesPerUnit), bytesPerUnit);
+                                                
+                                                const str = formatMemoryValue(loadWrapper(props.load, ptr, bytesPerUnit), bytesPerUnit);
                                                 components.push(
                                                     <span
                                                         class={style + " cursor-default text-right tabular-nums whitespace-pre"}
@@ -239,7 +249,7 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
                                                             "display": "inline-block"
                                                         }}
                                                         onMouseEnter={(e) => {
-                                                            setHoveredNumber(props.load(ptr, bytesPerUnit));
+                                                            setHoveredNumber(loadWrapper(props.load, ptr, bytesPerUnit));
                                                             setMousePos({ x: e.clientX, y: e.clientY });
                                                         }}
                                                         onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
