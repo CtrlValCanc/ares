@@ -899,7 +899,7 @@ const char *handle_li(Parser *p, const char *opcode, size_t opcode_len) {
         if (lo >= 0x800) lo -= 0x1000;
         u32 hi = (u32)(simm - lo) >> 12;
         asm_emit(LUI(d, hi), p->startline);
-        asm_emit(ADDI(d, d, lo), p->startline);
+        if (lo != 0) asm_emit(ADDI(d, d, lo), p->startline);
     }
     return NULL;
 }
