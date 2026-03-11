@@ -371,8 +371,11 @@ int parse_reg(Parser *p) {
             if (num < 0 || num > 9) return -1;
             return num;
         } else {
+            // 2-digit registers starting with 0 are invalid
+            if (str[1] <= '0' || str[1] > '9') return -1;
+            if (str[2] < '0' || str[2] > '9') return -1;
             int num = (str[1] - '0') * 10 + (str[2] - '0');
-            if (num >= 32) return -1;
+            if (num < 0 || num >= 32) return -1;
             return num;
         }
     }

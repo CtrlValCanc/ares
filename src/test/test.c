@@ -220,6 +220,21 @@ void test_add_invalid_reg(void) {
     TEST_ASSERT_EQUAL_STRING(g_error, "Invalid rs2");
 }
 
+void test_add_invalid_reg_2(void) {
+    assemble_line("add xb, xc, xa");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid rd");
+}
+
+void test_add_invalid_reg_3(void) {
+    assemble_line("add x0, x0, x08");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid rs2");
+}
+
+void test_add_invalid_reg_4(void) {
+    assemble_line("add x0, x$, x0");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid rs1");
+}
+
 void test_case_insensitivity(void) {
     assemble_line("ADDI X1, X2, 0X41");
     TEST_ASSERT_EQUAL_STRING(g_error, NULL);
