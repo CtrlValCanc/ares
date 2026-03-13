@@ -399,6 +399,7 @@ static void c_assemble(void) {
 
 exit:
     if (out) fclose(out);
+    if (elf_contents) free(elf_contents);
     if (g_txt) {
         free(g_txt);
         g_txt = NULL;

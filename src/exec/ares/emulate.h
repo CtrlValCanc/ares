@@ -7,7 +7,7 @@
 #define PRIV_USER 0
 
 // Interrupt bit mask (MSB)
-#define CAUSE_INTERRUPT (1 << 31)
+#define CAUSE_INTERRUPT (1ul << 31)
 
 // Exception codes (INT = 0)
 #define CAUSE_INST_ADDR_MISALIGNED 0x00

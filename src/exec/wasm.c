@@ -3,19 +3,48 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define MALLOC_ALIGN 8
+
 extern char __heap_base;
 size_t g_heap_size = 0;
 extern void panic();
-void *malloc(size_t size) {
-    size_t bytes = __builtin_wasm_memory_size(0) << 16;
-    if ((g_heap_size + size) > bytes) {
-        size_t pages = (g_heap_size + size - bytes + 65535) >> 16;
-        __builtin_wasm_memory_grow(0, pages);
+
+void *memset(void *dest, int c, size_t n) {
+    uint8_t *pdest = (uint8_t *)dest;
+
+    for (size_t i = 0; i < n; i++) {
+        pdest[i] = c;
     }
-    void *alloc = (&__heap_base) + g_heap_size;
-    g_heap_size += size;
-    return alloc;
+
+    return dest;
 }
+
+void *malloc(size_t size) {
+    if (size == 0) return NULL;
+    size_t heap_base = (size_t)&__heap_base;
+    size_t curr = heap_base + g_heap_size;
+    size_t aligned = (curr + (MALLOC_ALIGN - 1)) & ~(MALLOC_ALIGN - 1);
+    size_t end;
+    if (__builtin_add_overflow(aligned, size, &end)) return NULL;
+    size_t allocated = __builtin_wasm_memory_size(0) << 16;
+    if (end > allocated) {
+        size_t delta = end - allocated;
+        size_t delta_pages = (delta + 65535) >> 16;
+        if (__builtin_wasm_memory_grow(0, delta_pages) == -1)
+            return NULL;
+    }
+    g_heap_size = end - heap_base;
+    return (void *)aligned;
+}
+
+void *calloc(size_t n, size_t size) {
+    size_t total;
+    if (__builtin_mul_overflow(n, size, &total)) return NULL;
+    void *ptr = malloc(total);
+    if (ptr) __builtin_memset(ptr, 0, total);
+    return ptr;
+}
+
 
 void free(void *ptr) {
     // lol
@@ -49,13 +78,5 @@ void *memcpy(void *dest, const void *src, size_t n) {
     return dest;
 }
 
-void *memset(void *dest, int c, size_t n) {
-    uint8_t *pdest = (uint8_t *)dest;
 
-    for (size_t i = 0; i < n; i++) {
-        pdest[i] = c;
-    }
-
-    return dest;
-}
 #endif

@@ -55,7 +55,7 @@ InstI(SLTIU, 0b00100, 0b011)
 InstI(XORI,  0b00100, 0b100)
 InstI(ORI,   0b00100, 0b110)
 InstI(ANDI,  0b00100, 0b111)
-InstI(CSRRW, 0x1C, 0b001);
+InstI(CSRRW, 0x1C, 0b001)
 InstI(CSRRS, 0x1C, 0b010)
 InstI(CSRRC, 0x1C, 0b011)
 InstI(CSRRWI, 0x1C, 0b101)
@@ -290,6 +290,7 @@ bool parse_numeric(Parser *p, i32 *out) {
             if (digit >= base) {
                 if (whitespace(c)) break;
                 if (c == ' ' || c == '(' || c == ',' || c == '\0') break;
+                *p = start;
                 return false;
             }
             parsed_digit = true;
@@ -331,7 +332,7 @@ bool parse_quoted_str(Parser *p, char **out_str, size_t *out_len) {
             if (c == 'n') c = '\n';
             else if (c == 't') c = '\t';
             else if (c == 'r') c = '\r';
-            else if (c == 'b') c = '\b';
+            else if (c == 'v') c = '\v';
             else if (c == 'f') c = '\f';
             else if (c == 'a') c = '\a';
             else if (c == 'b') c = '\b';
@@ -408,7 +409,7 @@ void asm_emit_byte(u8 byte, int linenum) {
     if (!g_in_fixup) {
         *ARES_ARRAY_PUSH(&g_section->contents) = byte;
     } else {
-        *ARES_ARRAY_INSERT(&g_section->contents, g_section->emit_idx) = byte;
+        *ARES_ARRAY_WRITE_AT(&g_section->contents, g_section->emit_idx) = byte;
     }
     g_section->emit_idx++;
 }
@@ -539,17 +540,17 @@ const char *reloc_abs32(const char *sym, size_t sym_len) {
 const char *handle_alu_reg(Parser *p, const char *opcode, size_t opcode_len) {
     int d, s1, s2;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s2 = parse_reg(p)) == -1) return "Invalid rs2";
 
     u32 inst = 0;
@@ -580,17 +581,17 @@ const char *handle_alu_imm(Parser *p, const char *opcode, size_t opcode_len) {
     int d, s1;
     i32 simm;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
 
     if (!parse_numeric(p, &simm)) return "Invalid immediate";
     if (simm < -2048 || simm > 2047) return "Out of bounds immediate";
@@ -620,20 +621,20 @@ const char *handle_ldst(Parser *p, const char *opcode, size_t opcode_len) {
     int reg, mem;
     i32 simm;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((reg = parse_reg(p)) == -1) return "Invalid rreg";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!parse_numeric(p, &simm)) return "Invalid immediate";
     if (simm < -2048 || simm > 2047) return "Out of bounds immediate";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, '(')) return "Expected (";
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((mem = parse_reg(p)) == -1) return "Invalid rmem";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ')')) return "Expected )";
 
     u32 inst = 0;
@@ -691,17 +692,17 @@ const char *handle_branch(Parser *p, const char *opcode, size_t opcode_len) {
     int s1, s2;
     bool later;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s2 = parse_reg(p)) == -1) return "Invalid rs2";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     const char *err = label(p, &orig, handle_branch, opcode, opcode_len, &addr,
                             &later, reloc_branch);
     if (err) return err;
@@ -736,12 +737,12 @@ const char *handle_branch_zero(Parser *p, const char *opcode,
     int s;
     bool later;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s = parse_reg(p)) == -1) return "Invalid rs";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     const char *err = label(p, &orig, handle_branch_zero, opcode, opcode_len,
                             &addr, &later, reloc_branch);
     if (err) return err;
@@ -771,12 +772,12 @@ const char *handle_alu_pseudo(Parser *p, const char *opcode,
     u32 addr;
     int d, s;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s = parse_reg(p)) == -1) return "Invalid rs";
 
     u32 inst = 0;
@@ -798,12 +799,12 @@ const char *handle_jump(Parser *p, const char *opcode, size_t opcode_len) {
     const char *err = NULL;
     bool later;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     // jal optionally takes a register argument
     if (str_eq_case(opcode, opcode_len, "jal") ||
         str_eq_case(opcode, opcode_len, "call")) {
         if ((d = parse_reg(p)) == -1) err = "Invalid rd";
-        skip_whitespace(p);
+        skip_trailing(p);
         if (consume_if(p, ',')) {
             if (err) return err;
         } else {
@@ -814,7 +815,7 @@ const char *handle_jump(Parser *p, const char *opcode, size_t opcode_len) {
         d = 0;
     } else assert(false);
 
-    skip_whitespace(p);
+    skip_trailing(p);
     u32 addr;
     err = label(p, &orig, handle_jump, opcode, opcode_len, &addr, &later,
                 reloc_jal);
@@ -835,36 +836,36 @@ const char *handle_jump_reg(Parser *p, const char *opcode, size_t opcode_len) {
     int d, s;
     i32 simm;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     // jalr rs
     // jalr rd, rs, simm
     // jalr rd, simm(rs)
     if (str_eq_case(opcode, opcode_len, "jalr")) {
         if ((d = parse_reg(p)) == -1) return "Invalid register";
-        skip_whitespace(p);
+        skip_trailing(p);
         if (!consume_if(p, ',')) {
             asm_emit(JALR(1, d, 0), p->startline);
             return NULL;
         }
-        skip_whitespace(p);
+        skip_trailing(p);
         if (parse_numeric(p, &simm)) {  // simm(rs)
-            skip_whitespace(p);
+            skip_trailing(p);
             if (!consume_if(p, '(')) return "Expected (";
-            skip_whitespace(p);
+            skip_trailing(p);
             if ((s = parse_reg(p)) == -1) return "Invalid rs";
-            skip_whitespace(p);
+            skip_trailing(p);
             if (!consume_if(p, ')')) return "Expected )";
         } else if (consume_if(p, '(')) {  // (rs)
             simm = 0;
-            skip_whitespace(p);
+            skip_trailing(p);
             if ((s = parse_reg(p)) == -1) return "Invalid rs";
-            skip_whitespace(p);
+            skip_trailing(p);
             if (!consume_if(p, ')')) return "Expected )";
         } else {  // rs1, simm
             if ((s = parse_reg(p)) == -1) return "Invalid rs";
-            skip_whitespace(p);
+            skip_trailing(p);
             if (!consume_if(p, ',')) return "Expected ,";
-            skip_whitespace(p);
+            skip_trailing(p);
             if (!parse_numeric(p, &simm)) return "Invalid immediate";
         }
         if (simm >= -2048 && simm <= 2047)
@@ -887,11 +888,11 @@ const char *handle_upper(Parser *p, const char *opcode, size_t opcode_len) {
     i32 simm;
     u32 inst = 0;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!parse_numeric(p, &simm)) return "Invalid immediate";
     // the immediate can either be signed or unsigned 20 bit
     if (simm < -524288 || simm > 1048575) return "Out of bounds immediate";
@@ -907,11 +908,11 @@ const char *handle_li(Parser *p, const char *opcode, size_t opcode_len) {
     int d;
     i32 simm;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!parse_numeric(p, &simm)) return "Invalid immediate";
 
     if (simm >= -2048 && simm <= 2047) {
@@ -931,13 +932,13 @@ const char *handle_la(Parser *p, const char *opcode, size_t opcode_len) {
     int d;
     bool later;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
     u32 addr;
-    skip_whitespace(p);
+    skip_trailing(p);
     const char *err = label(p, &orig, handle_la, opcode, opcode_len, &addr,
                             &later, reloc_hi20lo12i);
     if (later) {
@@ -948,8 +949,7 @@ const char *handle_la(Parser *p, const char *opcode, size_t opcode_len) {
     if (err) return err;
     i32 simm = addr - (g_section->emit_idx + g_section->base);
 
-    u32 lo = simm & 0xFFF;
-    if (lo >= 0x800) lo -= 0x1000;
+    i32 lo = (i32)(simm << 20) >> 20;
     u32 hi = (u32)(simm - lo) >> 12;
     asm_emit(AUIPC(d, hi), p->startline);
     asm_emit(ADDI(d, d, lo), p->startline);
@@ -979,19 +979,19 @@ const char *handle_sret(Parser *p, const char *opcode, size_t opcode_len) {
 const char *handle_csr(Parser *p, const char *opcode, size_t opcode_len) {
     int csr, d, s;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((csr = parse_csr(p)) == -1) return "Invalid CSR";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((s = parse_reg(p)) == -1) return "Invalid rs";
 
     u32 inst = 0;
@@ -1007,19 +1007,19 @@ const char *handle_csr_imm(Parser *p, const char *opcode, size_t opcode_len) {
     int csr, d;
     i32 zimm;
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if ((csr = parse_csr(p)) == -1) return "Invalid CSR";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
 
-    skip_whitespace(p);
+    skip_trailing(p);
     if (!parse_numeric(p, &zimm)) return "Invalid immediate";
 
     u32 inst = 0;
@@ -1182,6 +1182,12 @@ static void prepare_default_syms(void) {
 #undef MMIO_LABEL
 }
 
+/*
+    NOTE: both binutils and RARS do not support instructions spanning more lines, like
+    "li a0,\n93"
+    But RARS does support it for .byte etc, so for compatibility we do it too
+*/
+
 export void assemble(const char *txt, size_t s, bool allow_externs) {
     g_allow_externs = allow_externs;
     g_in_fixup = false;
@@ -1275,7 +1281,7 @@ export void assemble(const char *txt, size_t s, bool allow_externs) {
             const char *directive;
             size_t directive_len;
             parse_ident(p, &directive, &directive_len);
-            skip_whitespace(p);
+            skip_trailing(p);
 
             if (str_eq_case(directive, directive_len, "section")) {
                 const char *secname;
@@ -1301,7 +1307,7 @@ export void assemble(const char *txt, size_t s, bool allow_externs) {
                 g_section = g_text;
                 continue;
             } else if (str_eq_case(directive, directive_len, "globl")) {
-                skip_whitespace(p);
+                skip_trailing(p);
                 const char *ident;
                 size_t ident_len;
                 parse_ident(p, &ident, &ident_len);
@@ -1458,8 +1464,6 @@ export void assemble(const char *txt, size_t s, bool allow_externs) {
         }
         if (err) break;
 
-        // see comment above skip_trailing on why this is distinct from
-        // skip_whitespace
         skip_trailing(p);
         char next = peek(p);
         if (next != '\n' && next != '\0') {
@@ -1568,7 +1572,7 @@ void prepare_aux_sections() {
     *g_stack = (Section){.name = "ARES_STACK",
                          .base = STACK_TOP - STACK_LEN,
                          .limit = STACK_TOP,
-                         .contents = ARES_ARRAY_PREPARE(u8, STACK_LEN),
+                         .contents = ARES_ARRAY_FILL(u8, STACK_LEN),
                          .emit_idx = 0,
                          .align = 1,
                          .relocations = {.buf = NULL, .len = 0, .cap = 0},
@@ -1576,8 +1580,6 @@ void prepare_aux_sections() {
                          .write = true,
                          .execute = false,
                          .physical = false};
-
-    g_stack->contents.buf = malloc(g_stack->contents.len);
     // fill all the memory with random uninitialized values
     memset(g_stack->contents.buf, 0xAB, g_stack->contents.len);
 

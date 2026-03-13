@@ -189,44 +189,10 @@ void test_sw_immediate_negative(void) {
     TEST_ASSERT_EQUAL_INT(word, 0xfe112fa3);
 }
 
-void test_sw_immediate_newline(void) {
-    assemble_line("sw x1, 1000\n(x2)"); 
-    TEST_ASSERT_EQUAL_STRING(g_error, NULL);
-}
-
-void test_addi_immediate_newline_after_comma(void) {
-    assemble_line("addi x1, x2,\n300");
-    TEST_ASSERT_EQUAL_STRING(g_error, NULL);
-}
-
-void test_sw_immediate_multiple_newlines(void) {
-    assemble_line("sw x1, 1000\n\n(x2)");
-    TEST_ASSERT_EQUAL_STRING(g_error, NULL);
-}
-
-void test_sw_register_newline(void) {
-    assemble_line("sw x1, 1000(x\n2)");
-    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid rmem");
-}
-
-void test_sw_register_newline2(void) {
-    assemble_line("sw x1, 1000(x2\n)");
-    TEST_ASSERT_EQUAL_STRING(g_error, NULL);
-}
-
-void test_addi_immediate_with_spaces_newlines(void) {
-    assemble_line("addi x1 ,\nx2,  -2048");
-    TEST_ASSERT_EQUAL_STRING(g_error, NULL);
-}
 
 void test_instruction_trailing_comma(void) {
     assemble_line("addi x1, x2, 300,");
     TEST_ASSERT_EQUAL_STRING(g_error, "Expected newline");
-}
-
-void test_sw_newline(void) {
-    assemble_line("sw\n x1\n,\n1000( x2)");
-    TEST_ASSERT_EQUAL_STRING(g_error, NULL);
 }
 
 void test_addi_oob(void) {
@@ -330,6 +296,48 @@ void test_parse_directives_nums_oob() {
     free_runtime();
 }
 
+void test_parse_numeric_hex_prefix_no_digits() {
+    assemble_line(".data\nvar: .word 0x");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid word");
+}
+void test_parse_numeric_bin_prefix_no_digits() {
+    assemble_line(".data\nvar: .word 0b");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid word");
+}
+
+void test_branch_cross_section_label() {
+    assemble_line(".data\nfoo: .word 0\n.text\nbeq a0, a1, foo");
+    TEST_ASSERT_NOT_NULL(g_error);
+}
+
+void test_jalr_sign_before_paren() {
+    assemble_line("jalr a0, -(a1)");
+    TEST_ASSERT_NOT_NULL(g_error);
+}
+
+void test_parse_string_bad_escape() {
+    assemble_line(".data\n.asciz \"hello\\q\"");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid string");
+}
+
+void test_branch_forward_out_of_range() {
+    char buf[8192 + 64];
+    strcpy(buf, ".text\nbeq a0, a1, far\n");
+    for (int i = 0; i < 2048; i++) strcat(buf, "nop\n");
+    strcat(buf, "far:\nnop");
+    assemble_line(buf);
+    TEST_ASSERT_EQUAL_STRING(g_error, "Branch immediate too large");
+}
+
+
+void test_globl_without_definition() {
+    assemble_line(".text\n.globl foo\nret");
+    TEST_ASSERT_NULL(g_error);
+    u32 addr;
+    Section *sec;
+    TEST_ASSERT_FALSE(resolve_symbol("foo", 3, true, &addr, &sec));
+}
+
 void test_parse_directives_str() {
     assemble_line(".data\nstr: .ASCII \"hi\", \"hi\"");
     TEST_ASSERT_EQUAL_STR("hihi", g_data->contents.buf, g_data->contents.len);
@@ -423,11 +431,124 @@ void test_start_in_data(void) {
     TEST_ASSERT_EQUAL_STRING(g_error, "_start not in .text section");
 }
 
+void test_parse_numeric_char_escape_newline(void) {
+    Parser p = init_parser("'\\n'");
+    i32 result = 0;
+    TEST_ASSERT_TRUE(parse_numeric(&p, &result));
+    TEST_ASSERT_EQUAL_INT('\n', result);
+}
+
+void test_parse_numeric_char_escape_null(void) {
+    Parser p = init_parser("'\\0'");
+    i32 result = 0;
+    TEST_ASSERT_TRUE(parse_numeric(&p, &result));
+    TEST_ASSERT_EQUAL_INT(0, result);
+}
+
+void test_parse_numeric_char_literal(void) {
+    Parser p = init_parser("'A'");
+    i32 result = 0;
+    TEST_ASSERT_TRUE(parse_numeric(&p, &result));
+    TEST_ASSERT_EQUAL_INT('A', result);
+}
+
+void test_parse_numeric_char_bad_escape(void) {
+    Parser p = init_parser("'\\q'");
+    i32 result = 0;
+    TEST_ASSERT_FALSE(parse_numeric(&p, &result));
+}
+
+void test_skip_comment_line(void) {
+    const char* str = "// line comment\n123";
+    Parser p = init_parser(str);
+    TEST_ASSERT_TRUE(skip_comment(&p));
+    TEST_ASSERT_EQUAL_CHAR('\n', str[p.pos]);
+}
+
+void test_skip_comment_hash(void) {
+    const char* str = "# preprocessor\n456";
+    Parser p = init_parser("# preprocessor\n456");
+    TEST_ASSERT_TRUE(skip_comment(&p));
+    TEST_ASSERT_EQUAL_CHAR('\n', str[p.pos]);
+}
+
+void test_skip_whitespace_updates_lineidx(void) {
+    Parser p = init_parser("\n\n\nret");
+    skip_whitespace(&p);
+    TEST_ASSERT_EQUAL_INT(4, p.lineidx);
+}
+
+void test_word_list(void) {
+    assemble_line(".data\n.word 1, 2, 3");
+    TEST_ASSERT_NULL(g_error);
+    TEST_ASSERT_EQUAL_INT(12, g_data->contents.len);
+    bool err;
+    TEST_ASSERT_EQUAL_INT(1, LOAD(g_data->base,     4, &err));
+    TEST_ASSERT_EQUAL_INT(2, LOAD(g_data->base + 4, 4, &err));
+    TEST_ASSERT_EQUAL_INT(3, LOAD(g_data->base + 8, 4, &err));
+}
+
+void test_ascii_no_null_terminator(void) {
+    assemble_line(".data\n.ascii \"hi\"");
+    TEST_ASSERT_NULL(g_error);
+    TEST_ASSERT_EQUAL_INT(2, g_data->contents.len);
+}
+
+void test_asciz_null_terminator(void) {
+    assemble_line(".data\n.asciz \"hi\"");
+    TEST_ASSERT_NULL(g_error);
+    TEST_ASSERT_EQUAL_INT(3, g_data->contents.len);
+    TEST_ASSERT_EQUAL_CHAR('\0', g_data->contents.buf[2]);
+}
+
+void test_label_address_increments(void) {
+    assemble_line(".data\nfoo: .word 1\nbar: .word 2");
+    TEST_ASSERT_NULL(g_error);
+    u32 foo_addr, bar_addr;
+    Section *sec;
+    resolve_symbol("foo", 3, false, &foo_addr, &sec);
+    resolve_symbol("bar", 3, false, &bar_addr, &sec);
+    TEST_ASSERT_EQUAL_INT(4, bar_addr - foo_addr);
+}
+
+void test_section_switch(void) {
+    assemble_line(".data\nfoo: .word 99\n.text\nadd x0,x0,x0\n.data\nbar: .word 88");
+    TEST_ASSERT_NULL(g_error);
+    TEST_ASSERT_EQUAL_INT(8, g_data->contents.len);
+    TEST_ASSERT_EQUAL_INT(4, g_text->contents.len);
+}
+
+void test_resolve_symbol_not_found(void) {
+    assemble_line("ret");
+    u32 addr;
+    Section *sec;
+    TEST_ASSERT_FALSE(resolve_symbol("foo", 5, false, &addr, &sec));
+}
+
+void test_multiline_block_comment_in_code(void) {
+    assemble_line("/* comment */\nret\n/* another */");
+    TEST_ASSERT_NULL(g_error);
+    TEST_ASSERT_EQUAL_INT(4, g_text->contents.len);
+}
+
+void test_label_at_end_of_file(void) {
+    assemble_line(".text\nfoo:");
+    TEST_ASSERT_NULL(g_error);
+    u32 addr;
+    Section *sec;
+    TEST_ASSERT_TRUE(resolve_symbol("foo", 3, false, &addr, &sec));
+}
+
+void test_unknown_section(void) {
+    assemble_line(".section .foo");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Section not found");
+}
+
 void test_linenum(void) {
     assemble_line("\
 addi x0, x0, 1 \n\
-addi x0, x0,   \n\
-    2          \n\
+addi x0, x0, 2 \n\
+               \n\
 addi x0, x0, 3 \n\
 ");
     TEST_ASSERT_EQUAL_INT(g_text_by_linenum.buf[0], 1);
