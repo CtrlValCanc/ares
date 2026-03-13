@@ -15,6 +15,7 @@ export interface Colors {
     base1a: string;
     base2: string;
     base3: string;
+    comment: string;
     base4: string;
     base5: string;
     red: string;
@@ -45,6 +46,7 @@ const darkColors: Colors = {
     base3: "#89929b",
     base4: "#c6cdd5",
     base5: "#ecf2f8",
+    comment: "#5ec76e",
     red: "#fa7970",
     orange: "#faa356",
     bgorange0: "#551500",
@@ -68,12 +70,12 @@ const lightColors = {
     base3: "#959da5",
     base4: "#586069",
     base5: "#24292e",
+    comment: "#008110",
     purp: "#8250df",
     red: "#cf222e",
     orange: "#953800",
     blue: "#0a3069",
     lightblue: "#0550ae",
-    comment: "#59636e",
     green: "#116329",
     bgorange0: "#ffdab3",
     bgorange: "#fac080",

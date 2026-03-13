@@ -92,7 +92,7 @@ function updateCss(colors: Colors): void {
 .theme-style4 { color: ${colors.base4}; }
 .theme-style5 { color: ${colors.orange}; }
 .theme-style6 { color: ${colors.lightblue}; }
-.theme-style7 { color: ${colors.base3}; }
+.theme-style7 { color: ${colors.comment}; }
 .theme-style8 { font-weight: bold; }
 .theme-style9 { font-style: italic; }
 .theme-style10 { text-decoration: line-through; }

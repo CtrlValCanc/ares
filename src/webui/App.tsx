@@ -110,7 +110,7 @@ const App: Component = () => {
 					</PaneResize>}
 					{() => (<div
 						innerText={consoleText(wasmRuntime) ? consoleText(wasmRuntime) : "Console output will go here..."}
-						class={"w-full h-full theme-mono ml-2 mt-1 text-md overflow-auto theme-scrollbar theme-bg " + (consoleText(wasmRuntime) ? "theme-fg" : "theme-fg2")}
+						class={"w-full h-full theme-mono ml-2 mt-1 text-md overflow-auto theme-scrollbar theme-bg theme-fg"}
 					></div>)}
 				</PaneResize>}
 			</PaneResize>

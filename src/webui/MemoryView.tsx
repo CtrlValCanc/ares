@@ -133,7 +133,7 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
         <div class="h-full flex flex-col overflow-hidden" onMouseDown={() => setAddrSelect(-1)}>
             <TabSelector tab={activeTab()} setTab={setActiveTab} tabs={[".text", "disasm", ".data", "stack", "frames"]} />
 
-            <div class="font-semibold theme-mono ml-2 theme-fg2">
+            <div class="font-semibold theme-mono ml-2 theme-fg">
                 <a class="theme-style6 inline-block" style={{ width: charWidth() * 10 + "px" }}>address</a>
                 <a>{activeTab() == "disasm" ? "instructions" : "contents"}</a>
             </div>
