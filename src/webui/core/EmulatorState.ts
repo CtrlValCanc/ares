@@ -25,33 +25,33 @@ export type EmulatorState =
     | { status: "idle"; version: number }
     | { status: "asmerr"; error: AssemblyError; version: number }
     | {
-          status: "stopped";
-          consoleText: string;
-          pc: number;
-          regs: number[];
-          version: number;
-      }
+        status: "stopped";
+        consoleText: string;
+        pc: number;
+        regs: number[];
+        version: number;
+    }
     | {
-          status: "debug";
-          consoleText: string;
-          pc: number;
-          regs: number[];
-          shadowStack: ShadowStackEntry[];
-          memWrittenAddr: number;
-          memWrittenLen: number;
-          regWritten: number;
-          line: number;
-          version: number;
-      }
+        status: "debug";
+        consoleText: string;
+        pc: number;
+        regs: number[];
+        shadowStack: ShadowStackEntry[];
+        memWrittenAddr: number;
+        memWrittenLen: number;
+        regWritten: number;
+        line: number;
+        version: number;
+    }
     | {
-          status: "error";
-          consoleText: string;
-          pc: number;
-          regs: number[];
-          shadowStack: ShadowStackEntry[];
-          line: number;
-          version: number;
-      };
+        status: "error";
+        consoleText: string;
+        pc: number;
+        regs: number[];
+        shadowStack: ShadowStackEntry[];
+        line: number;
+        version: number;
+    };
 
 export type TestCaseResult = {
     input: string;
@@ -151,12 +151,12 @@ export class Emulator {
     // code finishes execution correctly, state=stopped
     // editor triggers a relint: without buildForLinter being different, we'd go to
     // state=idle and lose the console text
-    buildForLinter(source: string): EmulatorState | null {
+    buildForLinter(source: string): Extract<EmulatorState, { status: "idle" | "asmerr" }> | null {
         if (this.lastInput === source) return null;
         const suffix =
             this.testData ?
                 this.testData.testPrefix + this.testData.testcases[0].input
-            :   "";
+                : "";
         return this.build(source, suffix);
     }
 
@@ -395,10 +395,10 @@ export class Emulator {
             const frameBase =
                 i === len - 1 ?
                     liveSp
-                :   raw[(i + 1) * SHADOW_STACK_ENT_SIZE + SHADOW_STACK_SP];
+                    : raw[(i + 1) * SHADOW_STACK_ENT_SIZE + SHADOW_STACK_SP];
 
             let elemCount = (frameSp - frameBase) / 4;
-            
+
             // could happen on broken code if sp grows in the opposite direction
             if (elemCount < 0) elemCount = 0;
 

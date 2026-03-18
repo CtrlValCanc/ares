@@ -30,6 +30,10 @@ export let wasmInterface!: WasmInterface;
 export let emulator!: Emulator;
 export let testData!: TestData;
 
+declare global {
+  interface Window { __wasmFetch: Promise<Response>; }
+}
+
 async function initEmulator() {
   if (import.meta.hot?.data.emulator) {
     wasmInterface = import.meta.hot.data.wasmInterface;
@@ -38,8 +42,9 @@ async function initEmulator() {
     return;
   }
 
+  let wasmFetch = window.__wasmFetch ?? fetch(wasmUrl);
   const [wi, tc] = await Promise.all([
-    WasmInterface.loadModule(await fetch(wasmUrl).then(r => r.arrayBuffer())),
+    WasmInterface.loadModule(await wasmFetch.then(r => r.arrayBuffer())),
     fetchTestData(),
   ]);
   wasmInterface = wi;

@@ -1,5 +1,5 @@
-import { createEffect, createSignal } from "solid-js";
-import { Colors, githubDark, githubLight, Theme } from "./GithubTheme";
+import { createEffect, createRoot, createSignal } from "solid-js";
+import { Colors, githubDark, githubLight } from "./GithubTheme";
 
 export let [currentTheme, setCurrentTheme] = createSignal(getDefaultTheme());
 
@@ -131,10 +131,10 @@ function updateCss(colors: Colors): void {
 `;
 }
 
-createEffect(() => {
+createRoot(() => createEffect(() => {
 	const theme = currentTheme();
 	updateCss(theme.colors);
-});
+}));
 
 
 function getDefaultTheme() {
