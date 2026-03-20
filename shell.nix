@@ -11,7 +11,7 @@ pkgs.mkShell {
     git
     
     # Web
-    nodejs_22
+    nodejs_latest
   ];
 
   shellHook = ''
