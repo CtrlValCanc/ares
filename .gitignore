@@ -1,6 +1,8 @@
 .env
 .cache
 dist
+bin
+result
 a.out
 src/webui/main.wasm
 pnpm-lock.yaml

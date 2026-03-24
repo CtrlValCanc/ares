@@ -25,7 +25,7 @@ src/test/test_main.c: $(TEST_SRC)
 	./src/test/gen_main.sh src/test/test.c > src/test/test_main.c
 
 ares_test: $(TEST_SRC) src/test/test_main.c $(LIBEZLD)
-	clang $(CFLAGS) $(ARES_FLAGS) $(TEST_SRC) src/test/test_main.c $(LIBEZLD) -o ares_test -Isrc/unity/src
+	$(CC) $(CFLAGS) $(ARES_FLAGS) $(TEST_SRC) src/test/test_main.c $(LIBEZLD) -o ares_test -Isrc/unity/src
 
 ares_test_cov: $(TEST_SRC) src/test/test_main.c $(LIBEZLD)
 	clang $(CFLAGS) $(ARES_FLAGS) $(TEST_SRC) src/test/test_main.c $(LIBEZLD) -fprofile-instr-generate -fcoverage-mapping -o ares_test -Isrc/unity/src

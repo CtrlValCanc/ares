@@ -46,6 +46,6 @@ make
 Clang with support for WASM (if you're using macOS, ensure you're not using AppleClang), node and npm
 ```
 npm install
-npm run dev # for a developement live reload server
+npm run dev # for a development live reload server
 npm run build # to build in dist/
 ```
