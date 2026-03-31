@@ -117,6 +117,7 @@ typedef struct Section {
     bool execute;
     bool super;
     bool physical;
+    ARES_ARRAY(u32) by_linenum;
 } Section, *SectionPtr;
 
 typedef struct LabelData {
@@ -182,7 +183,6 @@ extern ARES_ARRAY(SectionPtr) g_sections;
 extern ARES_ARRAY(LabelData) g_labels;
 extern ARES_ARRAY(Global) g_globals;
 extern ARES_ARRAY(Extern) g_externs;
-extern export ARES_ARRAY(u32) g_text_by_linenum;
 
 extern export u32 g_error_line;
 extern export const char *g_error;

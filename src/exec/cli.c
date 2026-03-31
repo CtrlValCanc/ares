@@ -171,8 +171,8 @@ err:
             fprintf(stderr, "(at %.*s+0x%x", (int)label->len, label->txt, off);
             size_t line_idx = (ent->pc - TEXT_BASE) / 4;
 
-            if (line_idx < ARES_ARRAY_LEN(&g_text_by_linenum)) {
-                u32 linenum = *ARES_ARRAY_GET(&g_text_by_linenum, line_idx);
+            if (line_idx < ARES_ARRAY_LEN(&g_text->by_linenum)) {
+                u32 linenum = *ARES_ARRAY_GET(&g_text->by_linenum, line_idx);
                 fprintf(stderr, ", line %u)", linenum);
             } else {
                 fprintf(stderr, ")");

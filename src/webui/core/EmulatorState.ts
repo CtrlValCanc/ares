@@ -105,13 +105,13 @@ export class Emulator {
     private resolveBreakpoints(): void {
         this.breakpointAddrs = new Set();
         for (const line of this.breakpointLines) {
-            const len = this.wasm.textByLinenumLen?.[0] ?? 0;
-            for (let i = 0; i < len; i++) {
-                if (this.wasm.textByLinenum![i] === line) {
-                    this.breakpointAddrs.add(TEXT_BASE + i * 4);
-                }
-            }
+            const r = this.wasm.getAddrFromLine(line);
+            this.breakpointAddrs.add(r.start);
         }
+    }
+
+    public getAddrFromLine(line: number): { start: number, len: number } {
+        return this.wasm.getAddrFromLine(line);
     }
 
     // -- statemachine --
@@ -429,9 +429,7 @@ export class Emulator {
     }
 
     private getCurrentLine(): number {
-        const idx = (this.wasm.pc[0] - TEXT_BASE) / 4;
-        const len = this.wasm.textByLinenumLen?.[0] ?? 0;
-        return idx < len ? this.wasm.textByLinenum![idx] : 0;
+        return this.wasm.getLineFromPc();
     }
 
     // -- wrappers to be passed directly

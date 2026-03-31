@@ -16,19 +16,19 @@ export const SHADOW_STACK_ARGS = 2;
 export const SHADOW_STACK_ARG_COUNT = 8;
 
 export function toUnsigned(x: number): number {
-    return x >>> 0;
+  return x >>> 0;
 }
 
 export function convertNumber(x: number, decimal: boolean): string {
-    if (!decimal) {
-        return toUnsigned(x).toString(16).padStart(8, "0");
-    }
-    const u = toUnsigned(x);
-    const isPointer =
-        (u >= TEXT_BASE && u <= TEXT_END) ||
-        (u >= STACK_TOP - STACK_LEN && u <= STACK_TOP) ||
-        (u >= DATA_BASE && u <= DATA_END);
-    return isPointer ? "0x" + u.toString(16).padStart(8, "0") : u.toString();
+  if (!decimal) {
+    return toUnsigned(x).toString(16).padStart(8, "0");
+  }
+  const u = toUnsigned(x);
+  const isPointer =
+    (u >= TEXT_BASE && u <= TEXT_END) ||
+    (u >= STACK_TOP - STACK_LEN && u <= STACK_TOP) ||
+    (u >= DATA_BASE && u <= DATA_END);
+  return isPointer ? "0x" + u.toString(16).padStart(8, "0") : u.toString();
 }
 
 
@@ -36,6 +36,10 @@ interface WasmExports {
   emulate(): void;
   assemble: (offset: number, len: number, allow_externs: boolean) => void;
   pc_to_label: (pc: number) => void;
+  get_addr_from_line: (address: number) => void;
+  get_line_from_pc: () => number;
+  g_get_addr_from_line_start: number;
+  g_get_addr_from_line_end: number;
   emu_load: (addr: number, size: number) => number;
   emu_disassemble: (addr: number) => number;
   __heap_base: number;
@@ -47,7 +51,6 @@ interface WasmExports {
   g_got_breakpoint: number;
   g_reg_written: number;
   g_pc: number;
-  g_text_by_linenum: number;
   g_error: number;
   g_error_line: number;
   g_runtime_error_pc: number;
@@ -78,11 +81,11 @@ export class WasmInterface {
   public readonly shadowStackPtr: Uint32Array;
   public readonly shadowStackLen: Uint32Array;
   public readonly callsanWrittenBy: Uint8Array;
+  public readonly getAddrFromLineStart: Uint32Array;
+  public readonly getAddrFromLineEnd: Uint32Array;
 
   public successfulExecution: boolean = false;
   private currRunMemory: Uint8Array;
-  public textByLinenum?: Uint32Array;
-  public textByLinenumLen?: Uint32Array;
 
   public textBuffer: string = "";
   public hasError: boolean = false;
@@ -112,6 +115,8 @@ export class WasmInterface {
     this.callsanWrittenBy = this.createU8(
       this.exports.g_callsan_stack_written_by,
     );
+    this.getAddrFromLineStart = this.createU32(this.exports.g_get_addr_from_line_start);
+    this.getAddrFromLineEnd = this.createU32(this.exports.g_get_addr_from_line_end);
   }
 
   createU8(off: number) {
@@ -169,9 +174,6 @@ export class WasmInterface {
     this.createU8(offset).set(strBytes);
     this.createU32(this.exports.g_heap_size)[0] = (strLen + 7) & ~7; // align up to 8
     this.exports.assemble(offset, strLen, false);
-    const textByLinenumPtr = this.createU32(this.exports.g_text_by_linenum)[2];
-    this.textByLinenum = this.createU32(textByLinenumPtr);
-    this.textByLinenumLen = this.createU32(this.exports.g_text_by_linenum);
 
     const errorLine = this.createU32(this.exports.g_error_line)[0];
     const errorPtr = this.createU32(this.exports.g_error)[0];
@@ -200,6 +202,16 @@ export class WasmInterface {
     }
     return "0x" + pc.toString(16);
   }
+
+  getAddrFromLine(line: number): { start: number, len: number } {
+    this.exports.get_addr_from_line(line);
+    return { start: this.getAddrFromLineStart[0], len: this.getAddrFromLineEnd[0] - this.getAddrFromLineStart[0] };
+  }
+
+  getLineFromPc(): number {
+    return this.exports.get_line_from_pc();
+  }
+
 
   disassemble(pc: number): string {
     const inst = this.exports.emu_load(pc, 4);

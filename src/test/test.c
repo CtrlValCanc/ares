@@ -596,10 +596,10 @@ addi x0, x0, 2 \n\
                \n\
 addi x0, x0, 3 \n\
 ");
-    TEST_ASSERT_EQUAL_INT(g_text_by_linenum.buf[0], 1);
-    TEST_ASSERT_EQUAL_INT(g_text_by_linenum.buf[1], 2);
-    TEST_ASSERT_EQUAL_INT(g_text_by_linenum.buf[2], 4);
-    TEST_ASSERT_EQUAL_INT(g_text_by_linenum.len, 3);
+    TEST_ASSERT_EQUAL_INT(g_text->by_linenum.buf[0], 1);
+    TEST_ASSERT_EQUAL_INT(g_text->by_linenum.buf[1 * 4], 2);
+    TEST_ASSERT_EQUAL_INT(g_text->by_linenum.buf[2 * 4], 4);
+    TEST_ASSERT_EQUAL_INT(g_text->by_linenum.len, 3 * 4);
 }
 
 void test_linenum_2(void) {
@@ -618,7 +618,7 @@ foo:\n\
     lw    a0, 0(a0)\n\
     lw    a1, 0(a1)\n\
 ");
-    TEST_ASSERT_EQUAL_INT(g_text_by_linenum.len, 7);
+    TEST_ASSERT_EQUAL_INT(g_text->by_linenum.len, 7 * 4);
 }
 
 // -- runtime tests

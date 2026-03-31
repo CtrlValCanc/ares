@@ -11,6 +11,7 @@ import { Theme } from "./GithubTheme";
 import { lineHighlightEffect, lineHighlightState } from "./LineHighlight";
 import { riscvLanguage } from "./RiscVLanguage";
 import { headerDecoration } from "./TestSuite";
+import { ViewPlugin } from "@codemirror/view";
 
 // we cannot use naive setText for every keystroke, that would be too inefficient for larger files
 // so we need to return a getText getter from Editor
@@ -43,9 +44,48 @@ type EditorProps = {
     readonly editorInterfaceRef: EditorInterface,
     readonly storeText: (text: string) => void,
     readonly setBreakpoints: (lines: number[]) => void,
-    readonly doBuild: (text: string) => boolean
+    readonly doBuild: (text: string) => boolean,
+    readonly onHoveredLine: (line: number | null) => void,
 };
 
+export function hoveredLinePlugin(onHoveredLine: (line: number | null) => void) {
+    return ViewPlugin.define(view => {
+        let currentLine: number | null = null;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+            if (pos === null) {
+                if (currentLine !== null) {
+                    currentLine = null;
+                    onHoveredLine(null);
+                }
+                return;
+            }
+            const line = view.state.doc.lineAt(pos).number;
+            if (line !== currentLine) {
+                currentLine = line;
+                onHoveredLine(line);
+            }
+        };
+
+        const handleMouseLeave = () => {
+            if (currentLine !== null) {
+                currentLine = null;
+                onHoveredLine(null);
+            }
+        };
+
+        view.dom.addEventListener("mousemove", handleMouseMove);
+        view.dom.addEventListener("mouseleave", handleMouseLeave);
+
+        return {
+            destroy() {
+                view.dom.removeEventListener("mousemove", handleMouseMove);
+                view.dom.removeEventListener("mouseleave", handleMouseLeave);
+            },
+        };
+    });
+}
 
 export const Editor: Component<EditorProps> = props => {
     let editor: HTMLDivElement | undefined;
@@ -66,6 +106,7 @@ export const Editor: Component<EditorProps> = props => {
         const state = EditorState.create({
             doc: orig,
             extensions: [
+                [hoveredLinePlugin(props.onHoveredLine)],
                 tabKeymap,
                 new LanguageSupport(riscvLanguage, [dummyIndent]),
                 lintCompartment.of(asmLinter),

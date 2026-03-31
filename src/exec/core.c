@@ -14,7 +14,6 @@ ARES_ARRAY(SectionPtr) g_sections = ARES_ARRAY_NEW(SectionPtr);
 ARES_ARRAY(Extern) g_externs = ARES_ARRAY_NEW(Extern);
 ARES_ARRAY(LabelData) g_labels = ARES_ARRAY_NEW(LabelData);
 ARES_ARRAY(Global) g_globals = ARES_ARRAY_NEW(Global);
-export ARES_ARRAY(u32) g_text_by_linenum;
 
 static ARES_ARRAY(DeferredInsn) g_deferred_insn = ARES_ARRAY_NEW(DeferredInsn);
 
@@ -408,6 +407,7 @@ int parse_csr(Parser *p) {
 void asm_emit_byte(u8 byte, int linenum) {
     if (!g_in_fixup) {
         *ARES_ARRAY_PUSH(&g_section->contents) = byte;
+        *ARES_ARRAY_PUSH(&g_section->by_linenum) = linenum;
     } else {
         *ARES_ARRAY_WRITE_AT(&g_section->contents, g_section->emit_idx) = byte;
     }
@@ -415,10 +415,6 @@ void asm_emit_byte(u8 byte, int linenum) {
 }
 
 void asm_emit(u32 inst, int linenum) {
-    if (g_section == g_text && !g_in_fixup) {
-        *ARES_ARRAY_PUSH(&g_text_by_linenum) = linenum;
-    }
-
     asm_emit_byte(inst >> 0, linenum);
     asm_emit_byte(inst >> 8, linenum);
     asm_emit_byte(inst >> 16, linenum);
@@ -1523,6 +1519,40 @@ bool pc_to_label_r(u32 pc, LabelData **ret, u32 *off) {
     return false;
 }
 
+export u32 g_get_addr_from_line_start;
+export u32 g_get_addr_from_line_end;
+void get_addr_from_line(u32 line) {
+    Section *startsec = NULL;
+    size_t j = 0;
+    for (size_t i = 0; i < ARES_ARRAY_LEN(&g_sections); i++) {
+        startsec = g_sections.buf[i];
+        for (j = 0; j < ARES_ARRAY_LEN(&startsec->by_linenum); j++) {
+            if (startsec->by_linenum.buf[j] == line) {
+                g_get_addr_from_line_start = startsec->base + j;
+                goto done1;
+            }
+        }
+    }
+    g_get_addr_from_line_start = 0;
+    g_get_addr_from_line_end = 0;
+    return;
+done1:;
+    for (; j < ARES_ARRAY_LEN(&startsec->by_linenum); j++) {
+        if (startsec->by_linenum.buf[j] > line) {
+            g_get_addr_from_line_end = (startsec->base + j);
+            return;
+        }
+    }
+    g_get_addr_from_line_end = (startsec->base + startsec->contents.len);
+}
+
+u32 get_line_from_pc() {
+    if (g_pc < TEXT_BASE) return 0;
+    size_t idx = g_pc - TEXT_BASE;
+    if (idx >= g_text->by_linenum.len) return 0;
+    return g_text->by_linenum.buf[idx];
+}
+
 // Ugly because i'm calling it from JS
 // The problem with this is that it's basically the cleanest way to do it
 const char *g_pc_to_label_txt;
@@ -1624,11 +1654,11 @@ void free_runtime(void) {
         Section *s = *ARES_ARRAY_GET(&g_sections, i);
         ARES_ARRAY_FREE(&s->relocations);
         ARES_ARRAY_FREE(&s->contents);
+        ARES_ARRAY_FREE(&s->by_linenum);
         free(s);
     }
 
     ARES_ARRAY_FREE(&g_sections);
-    ARES_ARRAY_FREE(&g_text_by_linenum);
     ARES_ARRAY_FREE(&g_labels);
     ARES_ARRAY_FREE(&g_deferred_insn);
     ARES_ARRAY_FREE(&g_globals);

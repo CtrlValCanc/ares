@@ -1,4 +1,5 @@
 import {
+	createSignal,
 	onMount,
 	type Component,
 } from "solid-js";
@@ -67,6 +68,7 @@ const App: Component = () => {
 			}
 		});
 	});
+	let [address, setAddress] = createSignal({ start: 0, len: 0 });
 	return (
 		<div class="fullsize flex flex-row overflow-hidden">
 			<PaneResize firstSize={0.5} direction="horizontal" second={true}>
@@ -85,6 +87,7 @@ const App: Component = () => {
 										diagnostics={state.status == "asmerr" ? state.error : undefined}
 										doBuild={(s) => buildForLinter(s)}
 										theme={currentTheme()}
+										onHoveredLine={line => setAddress(line !== null ? emulator.getAddrFromLine(line) : { start: 0, len: 0 })}
 									/>}
 									{r => <BacktraceView shadowStack={r.shadowStack} />}
 								</PaneResize>}
@@ -99,6 +102,8 @@ const App: Component = () => {
 						{() => <MemoryView version={() => state.version}
 							writeAddr={state.status == "debug" ? state.memWrittenAddr : 0}
 							writeLen={state.status == "debug" ? state.memWrittenLen : 0}
+							highlightAddr={address().start}
+							highlightLen={address().len}
 							sp={(state.status == "debug" || state.status == "error" || state.status == "stopped") ? state.regs[2] : 0}
 							fp={(state.status == "debug" || state.status == "error" || state.status == "stopped") ? state.regs[8] : 0}
 							pc={(state.status == "debug" || state.status == "error" || state.status == "stopped") ? state.pc : 0}

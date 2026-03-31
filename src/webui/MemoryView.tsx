@@ -16,7 +16,7 @@ function loadWrapper(load: (addr: number, pow: number) => number, ptr: number, s
     return val;
 }
 
-export const MemoryView: Component<{ version: () => any, writeAddr: number, writeLen: number, pc: number, sp: number, fp: number, load: (addr: number, pow: number) => number, shadowStack: any, disassemble: (pc: number) => string | null }> = (props) => {
+export const MemoryView: Component<{ version: () => any, writeAddr: number, writeLen: number, highlightAddr: number, highlightLen: number, pc: number, sp: number, fp: number, load: (addr: number, pow: number) => number, shadowStack: any, disassemble: (pc: number) => string | null }> = (props) => {
     let parentRef: HTMLDivElement | undefined;
     let dummyChar: HTMLDivElement | undefined;
 
@@ -169,7 +169,10 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
                                         props.version();
                                         const basePtr = TEXT_BASE + virtRow.index * 4;
                                         let inst = props.disassemble ? props.disassemble(basePtr) : "";
-                                        return inst;
+                                        let style = "";
+                                        if (basePtr >= props.highlightAddr && basePtr < (props.highlightAddr + props.highlightLen))
+                                            style = "font-bold";
+                                        return <div class={style}>{inst}</div>;
                                     })()}
                                 </div>
                             )}
@@ -221,6 +224,9 @@ export const MemoryView: Component<{ version: () => any, writeAddr: number, writ
                                                 else if (isGray) style = "theme-fg2";
                                                 else if (isSp) style = "sp-highlight";
                                                 else if (isFp) style = "fp-highlight";
+                                                if (ptr >= props.highlightAddr && ptr < props.highlightAddr + props.highlightLen)
+                                                    style += " font-bold";
+
                                                 // Use max width for consistent layout
                                                 const cellWidth = getCellWidthChars(bytesPerUnit);
 
