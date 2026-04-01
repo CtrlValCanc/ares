@@ -2,10 +2,10 @@ import { createSignal, onMount, onCleanup, Show, createEffect } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
 
 export const PaneResize = <T,>(props: {
-  firstSize: number;
-  direction: "vertical" | "horizontal";
-  second: T | null;
-  children: [() => JSX.Element, (data: T) => JSX.Element];
+    firstSize: number;
+    direction: "vertical" | "horizontal";
+    second: T | null;
+    children: [() => JSX.Element, (data: T) => JSX.Element];
 }) => {
     let handle: HTMLDivElement;
     let container: HTMLDivElement;
@@ -72,8 +72,8 @@ export const PaneResize = <T,>(props: {
 
     createEffect(() => {
         if (props.second !== null) {
-            const currentContainerSize = props.direction === "vertical" 
-                ? container?.clientHeight 
+            const currentContainerSize = props.direction === "vertical"
+                ? container?.clientHeight
                 : container?.clientWidth;
             if (currentContainerSize)
                 setSize(currentContainerSize * props.firstSize);
@@ -108,19 +108,18 @@ export const PaneResize = <T,>(props: {
                     props.second === null
                         ? "hidden"
                         : props.direction === "vertical"
-                            ? "relative w-full h-[4px] cursor-ns-resize touch-none"
-                            : "relative h-full w-[4px] cursor-ew-resize touch-none"
+                            ? "relative w-full h-[12px] flex-shrink-0 cursor-ns-resize touch-none flex items-center -my-[6px] z-10"
+                            : "relative h-full w-[12px] flex-shrink-0 cursor-ew-resize touch-none flex justify-center -mx-[6px] z-10"
                 }
             >
                 <div class={
                     props.direction === "vertical"
-                        ? "absolute top-1/2 left-0 w-full h-[2px] -translate-y-1/2 border-t theme-border"
-                        : "absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 border-l theme-border"
-                }></div>
+                        ? "w-full h-px theme-border border-t pointer-events-none"
+                        : "h-full w-px theme-border border-l pointer-events-none"
+                } />
             </div>
             <div class={props.second === null ? "hidden" : "theme-bg theme-fg flex-grow flex-shrink overflow-hidden"}>
                 <Show when={props.second}>{(s) => props.children[1](s())}</Show>
             </div>
-        </div>
-    );
+        </div>);
 };
