@@ -5,38 +5,44 @@ export const [displayFormat, setDisplayFormat] = createSignal<DisplayFormat>("he
 export const [unitSize, setUnitSize] = createSignal<UnitSize>(4);
 
 export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: number }> = (props) => {
-  const regnames = [
-    "ra",
-    "sp",
-    "gp",
-    "tp",
-    "t0",
-    "t1",
-    "t2",
-    "fp",
-    "s1",
-    "a0",
-    "a1",
-    "a2",
-    "a3",
-    "a4",
-    "a5",
-    "a6",
-    "a7",
-    "s2",
-    "s3",
-    "s4",
-    "s5",
-    "s6",
-    "s7",
-    "s8",
-    "s9",
-    "s10",
-    "s11",
-    "t3",
-    "t4",
-    "t5",
-    "t6",
+  // idx is the hardware register number
+  const registersLayout = [
+    { name: "ra",  idx: 1,  color: "" }, 
+
+    { name: "t0",  idx: 5,  color: "theme-style2" }, 
+    { name: "t1",  idx: 6,  color: "theme-style2" }, 
+    { name: "t2",  idx: 7,  color: "theme-style2" },
+    { name: "t3",  idx: 28, color: "theme-style2" }, 
+    { name: "t4",  idx: 29, color: "theme-style2" }, 
+    { name: "t5",  idx: 30, color: "theme-style2" }, 
+    { name: "t6",  idx: 31, color: "theme-style2" },
+    
+    { name: "a0",  idx: 10, color: "theme-style5" }, 
+    { name: "a1",  idx: 11, color: "theme-style5" }, 
+    { name: "a2",  idx: 12, color: "theme-style5" }, 
+    { name: "a3",  idx: 13, color: "theme-style5" },
+    { name: "a4",  idx: 14, color: "theme-style5" }, 
+    { name: "a5",  idx: 15, color: "theme-style5" }, 
+    { name: "a6",  idx: 16, color: "theme-style5" }, 
+    { name: "a7",  idx: 17, color: "theme-style5" },
+
+    { name: "s1",  idx: 9,  color: "theme-style7" }, 
+    { name: "s2",  idx: 18, color: "theme-style7" }, 
+    { name: "s3",  idx: 19, color: "theme-style7" }, 
+    { name: "s4",  idx: 20, color: "theme-style7" },
+    { name: "s5",  idx: 21, color: "theme-style7" }, 
+    { name: "s6",  idx: 22, color: "theme-style7" }, 
+    { name: "s7",  idx: 23, color: "theme-style7" }, 
+    { name: "s8",  idx: 24, color: "theme-style7" },
+    { name: "s9",  idx: 25, color: "theme-style7" }, 
+    { name: "s10", idx: 26, color: "theme-style7" }, 
+    { name: "s11", idx: 27, color: "theme-style7" },
+
+    { name: "fp",  idx: 8,  color: "theme-style1" },
+    { name: "sp",  idx: 2,  color: "theme-style1" },
+    
+    { name: "gp",  idx: 3,  color: "" },
+    { name: "tp",  idx: 4,  color: "" },
   ];
 
   // setting ascii will force unit size to byte
@@ -89,6 +95,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
               <option value="hex">hex</option>
               <option value="unsigned">unsigned</option>
               <option value="signed">signed</option>
+              <option value="ascii">ascii</option>
             </select>
             <svg class="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 theme-fg"
               xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-344 240-584l56-56 184 184 184-184 56 56-240 240Z" /></svg>
@@ -96,30 +103,35 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
         </div>
       </div>
 
+      {/* Register grid */}
       <div class="overflow-auto flex-grow text-md theme-mono theme-scrollbar-slim theme-border">
-        <div class="ml-[-1px] grid-cols-[repeat(auto-fit,minmax(20ch,1fr))] grid">
-          <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] ">
+        <div class="ml-[-1px] columns-[20ch] gap-0">
+          <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] break-inside-avoid">
             <div class="self-center pl-[1ch] font-bold">pc</div>
             <div class="self-center pr-[1ch]">{formatRegister(props.pc, "hex")}</div>
           </div>
           {/* using Index here would optimize it, but it gets messy with animations
             naively keeping it as is and making regWritten a signal would still cause everything to be recomputed
-        */}
-          {props.regs.slice(1).map((reg, idx) => (
-            <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch]">
-              <div class="self-center pl-[1ch] font-bold">
-                {regnames[idx]}/x{idx + 1}
+          */}
+          {registersLayout.map((regDef) => {
+            const val = props.regs[regDef.idx];
+            const hwName = `x${regDef.idx}`;
+
+            return (
+              <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] break-inside-avoid">
+                <div class={`self-center pl-[1ch] font-bold ${regDef.color}`}>
+                  {regDef.name}/{hwName}
+                </div>
+                <div class={"self-center mr-[1ch] " + (regDef.idx == props.regWritten ? "animate-fade-highlight" : "")}>
+                  {formatRegister(val, displayFormat())}
+                </div>
               </div>
-              <div class={"self-center mr-[1ch] " + (idx + 1 == props.regWritten ? "animate-fade-highlight" : "")}>
-                {formatRegister(reg, displayFormat())}
-              </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* dummy left border of the last element */}
-          <div class="theme-border border-l"></div>
-        </div>
-
+          <div class="theme-border border-l break-inside-avoid"></div>
+        </div>        
       </div>
     </div>
   );
