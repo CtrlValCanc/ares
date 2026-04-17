@@ -38,6 +38,24 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
     "t5",
     "t6",
   ];
+
+  // setting ascii will force unit size to byte
+  // the alternative would have been to only show ascii while unit size is byte
+  // but that is less discoverable
+
+  const handleFormatChange = (format: DisplayFormat) => {
+    if (format === "ascii") {
+      setUnitSize(1);
+    }
+    setDisplayFormat(format);
+  };
+
+  const handleUnitChange = (size: UnitSize) => {
+    setUnitSize(size);
+    if (size !== 1 && displayFormat() === "ascii") {
+      setDisplayFormat("hex");
+    }
+  };
   // all units being ch makes so that the precise sum is 1ch (left pad) + 7ch (x27/a10) + 10ch (0xdeadbeef) + 1ch (right pad)
   // round to 20ch so it has some padding between regname and hex
   // now i have the precise size in a font-independent format, as long as it's monospace
@@ -52,7 +70,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
               class="appearance-none font-semibold theme-fg theme-gutter px-2 pr-6 rounded theme-border focus:outline-none cursor-pointer"
               title="Memory unit size"
               value={unitSize()}
-              onChange={(e) => setUnitSize(Number(e.currentTarget.value) as UnitSize)}
+              onChange={(e) => handleUnitChange(Number(e.currentTarget.value) as UnitSize)}
             >
               <option value={1}>byte</option>
               <option value={2}>half</option>
@@ -66,7 +84,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
               class="appearance-none font-semibold theme-fg theme-gutter px-2 pr-6 rounded theme-border focus:outline-none cursor-pointer"
               title="Number format"
               value={displayFormat()}
-              onChange={(e) => setDisplayFormat(e.currentTarget.value as DisplayFormat)}
+              onChange={(e) => handleFormatChange(e.currentTarget.value as DisplayFormat)}
             >
               <option value="hex">hex</option>
               <option value="unsigned">unsigned</option>

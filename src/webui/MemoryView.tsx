@@ -208,17 +208,23 @@ const HexView: Component<{
                                     // trigger reactivity when the data changes
                                     props.version();
                                     let val = loadWrapper(props.load, cell().ptr, cell().bytesPerUnit);
-                                    return cell().ptr >= getStartAddr() + MEMORY_WINDOW_SIZE ? "" : formatMemoryValue(val, cell().bytesPerUnit, displayFormat());
+                                    let style = getStyle(cell().ptr);
+                                    // i need to add instead of override since getStyle also does bold highlighting
+                                    if (unitSize() == 1 && displayFormat() == "ascii" && (val < 26 || val > 126)) style += " theme-fg2";
+                                    return {
+                                        "style": style,
+                                        "val": cell().ptr >= getStartAddr() + MEMORY_WINDOW_SIZE ? "" : formatMemoryValue(val, cell().bytesPerUnit, displayFormat())
+                                    };
                                 };
                                 return (
                                     <span
-                                        class={getStyle(cell().ptr) + " cursor-default tabular-nums whitespace-pre"}
+                                        class={str().style + " cursor-default tabular-nums whitespace-pre"}
                                         style={{
-                                            "margin-right": `${cellWidth() + 1 - str().length}ch`,
+                                            "margin-right": `${cellWidth() + 1 - str().val.length}ch`,
                                             "display": "inline-block"
                                         }}
                                     >
-                                        {str()}
+                                        {str().val}
                                     </span>
                                 );
                             }}
