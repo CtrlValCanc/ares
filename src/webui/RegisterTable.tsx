@@ -104,8 +104,8 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
       </div>
 
       {/* Register grid */}
-      <div class="overflow-auto flex-grow text-md theme-mono theme-scrollbar-slim theme-border">
-        <div class="ml-[-1px] columns-[20ch] gap-0">
+      <div class="overflow-auto flex-grow text-md theme-mono theme-scrollbar-slim theme-border whitespace-nowrap">
+        <div class="ml-[-1px] columns-[20ch] gap-0 min-w-max">
           <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] break-inside-avoid">
             <div class="self-center pl-[1ch] font-bold">pc</div>
             <div class="self-center pr-[1ch]">{formatRegister(props.pc, "hex")}</div>
