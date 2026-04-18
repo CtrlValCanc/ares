@@ -105,8 +105,8 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
 
       {/* Register grid */}
       <div class="overflow-auto flex-grow text-md theme-mono theme-scrollbar-slim theme-border whitespace-nowrap">
-        <div class="ml-[-1px] columns-[20ch] gap-0 min-w-max">
-          <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] break-inside-avoid">
+        <div class="columns-[20ch] gap-0 min-w-max theme-border-column-rule">
+          <div class="justify-between flex flex-row box-content theme-border py-[0.5ch]">
             <div class="self-center pl-[1ch] font-bold">pc</div>
             <div class="self-center pr-[1ch]">{formatRegister(props.pc, "hex")}</div>
           </div>
@@ -118,7 +118,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
             const hwName = `x${regDef.idx}`;
 
             return (
-              <div class="justify-between flex flex-row box-content theme-border border-l py-[0.5ch] break-inside-avoid">
+              <div class="justify-between flex flex-row box-content py-[0.5ch]">
                 <div class={`self-center pl-[1ch] font-bold ${regDef.color}`}>
                   {regDef.name}/{hwName}
                 </div>
@@ -128,9 +128,6 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
               </div>
             );
           })}
-
-          {/* dummy left border of the last element */}
-          <div class="theme-border border-l break-inside-avoid"></div>
         </div>        
       </div>
     </div>

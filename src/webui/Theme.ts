@@ -62,6 +62,9 @@ function updateCss(colors: Colors): void {
 .theme-border {
 	border-color: ${colors.base2};
 }
+.theme-border-column-rule {
+	column-rule: 1px solid ${colors.base2};
+}
 .theme-tab {
 	background-color: ${colors.base1a};
 }
