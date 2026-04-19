@@ -652,9 +652,17 @@ const char *label(Parser *p, Parser *orig, DeferredInsnCb *cb,
                   const char *opcode, size_t opcode_len, u32 *out_addr,
                   bool *later, DeferredInsnReloc *reloc) {
     *later = false;
+
+    i32 off;
+    Parser fallback = *p;
+    if (parse_numeric(p, &off)) {
+        *out_addr = (u32)(g_section->emit_idx + g_section->base + off);
+        return NULL;
+    }
+    *p = fallback;
+
     const char *target;
     size_t target_len;
-
     parse_ident(p, &target, &target_len);
     if (target_len == 0) return "No label";
 
@@ -987,7 +995,9 @@ const char *handle_csr(Parser *p, const char *opcode, size_t opcode_len) {
     if (!consume_if(p, ',')) return "Expected ,";
 
     skip_trailing(p);
-    if ((csr = parse_csr(p)) == -1) return "Invalid CSR";
+    if (parse_numeric(p, &csr)) {
+        if (csr < 0 || csr >= 4096) return "Invalid CSR";
+    } else if ((csr = parse_csr(p)) == -1) return "Invalid CSR";
 
     skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
@@ -1015,7 +1025,9 @@ const char *handle_csr_imm(Parser *p, const char *opcode, size_t opcode_len) {
     if (!consume_if(p, ',')) return "Expected ,";
 
     skip_trailing(p);
-    if ((csr = parse_csr(p)) == -1) return "Invalid CSR";
+    if (parse_numeric(p, &csr)) {
+        if (csr < 0 || csr >= 4096) return "Invalid CSR";
+    } else if ((csr = parse_csr(p)) == -1) return "Invalid CSR";
 
     skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
@@ -1525,7 +1537,7 @@ export u32 g_get_addr_from_line_end;
 void get_addr_from_line(u32 line) {
     Section *startsec = NULL;
     size_t j = 0;
-    
+
     // find the section containing the line
     for (size_t i = 0; i < ARES_ARRAY_LEN(&g_sections); i++) {
         startsec = g_sections.buf[i];
@@ -1536,7 +1548,7 @@ void get_addr_from_line(u32 line) {
             }
         }
     }
-    
+
     // line not found in any section
     g_get_addr_from_line_start = 0;
     g_get_addr_from_line_end = 0;

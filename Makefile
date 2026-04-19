@@ -35,6 +35,9 @@ src/test/test_main.c: $(TEST_SRC)
 $(BIN_DIR)/ares_test: $(TEST_SRC) src/test/test_main.c $(LIBEZLD) | $(BIN_DIR)
 	$(CC) $(CFLAGS) $(ARES_FLAGS) $(TEST_SRC) src/test/test_main.c $(LIBEZLD) -o $@ -Isrc/unity/src
 
+$(BIN_DIR)/ares_test_roundtrip: $(TEST_SRC) src/test/test_roundtrip.c $(LIBEZLD) | $(BIN_DIR)
+	$(CC) $(CFLAGS) $(ARES_FLAGS) $(TEST_SRC) src/test/test_roundtrip.c $(LIBEZLD) -o $@ -Isrc/unity/src -O3 -flto -g3 -fno-omit-frame-pointer -g3
+
 $(BIN_DIR)/ares_test_cov: $(TEST_SRC) src/test/test_main.c $(LIBEZLD) | $(BIN_DIR)
 	clang $(CFLAGS) $(ARES_FLAGS) $(TEST_SRC) src/test/test_main.c $(LIBEZLD) -fprofile-instr-generate -fcoverage-mapping -o $@ -Isrc/unity/src
 
