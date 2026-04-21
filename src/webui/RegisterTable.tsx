@@ -7,7 +7,9 @@ export const [unitSize, setUnitSize] = createSignal<UnitSize>(4);
 export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: number }> = (props) => {
   // idx is the hardware register number
   const registersLayout = [
-    { name: "ra",  idx: 1,  color: "" }, 
+    { name: "ra",  idx: 1,  color: "theme-style1" }, 
+    { name: "sp",  idx: 2,  color: "theme-style1" },
+    { name: "fp",  idx: 8,  color: "theme-style1" },
 
     { name: "t0",  idx: 5,  color: "theme-style2" }, 
     { name: "t1",  idx: 6,  color: "theme-style2" }, 
@@ -37,9 +39,6 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
     { name: "s9",  idx: 25, color: "theme-style7" }, 
     { name: "s10", idx: 26, color: "theme-style7" }, 
     { name: "s11", idx: 27, color: "theme-style7" },
-
-    { name: "fp",  idx: 8,  color: "theme-style1" },
-    { name: "sp",  idx: 2,  color: "theme-style1" },
     
     { name: "gp",  idx: 3,  color: "" },
     { name: "tp",  idx: 4,  color: "" },
