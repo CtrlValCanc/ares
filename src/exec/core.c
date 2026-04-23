@@ -14,6 +14,7 @@ ARES_ARRAY(SectionPtr) g_sections = ARES_ARRAY_NEW(SectionPtr);
 ARES_ARRAY(Extern) g_externs = ARES_ARRAY_NEW(Extern);
 ARES_ARRAY(LabelData) g_labels = ARES_ARRAY_NEW(LabelData);
 ARES_ARRAY(Global) g_globals = ARES_ARRAY_NEW(Global);
+ARES_ARRAY(LocalLabel) g_local_labels = ARES_ARRAY_NEW(LocalLabel);
 
 static ARES_ARRAY(DeferredInsn) g_deferred_insn = ARES_ARRAY_NEW(DeferredInsn);
 
@@ -533,6 +534,29 @@ const char *reloc_abs32(const char *sym, size_t sym_len) {
     return NULL;
 }
 
+static const char *reloc_pcrel_hi20lo12i(const char *sym, size_t sym_len) {
+    size_t local_label_idx = ARES_ARRAY_LEN(&g_local_labels);
+    LocalLabel *lbl = ARES_ARRAY_PUSH(&g_local_labels);
+    lbl->section = g_section;
+    lbl->offset = g_section->emit_idx;
+
+    Relocation *r_hi = ARES_ARRAY_PUSH(&g_section->relocations);
+    r_hi->kind = RELOCATION_KIND_EXTERN;
+    r_hi->symbol = get_extern(sym, sym_len);
+    r_hi->addend = 0;
+    r_hi->offset = g_section->emit_idx;
+    r_hi->type = R_RISCV_PCREL_HI20;
+
+    Relocation *r_lo = ARES_ARRAY_PUSH(&g_section->relocations);
+    r_lo->kind = RELOCATION_KIND_LOCAL_LABEL;
+    r_lo->local_label_idx = local_label_idx;
+    r_lo->addend = 0;
+    r_lo->offset = g_section->emit_idx + 4;
+    r_lo->type = R_RISCV_PCREL_LO12_I;
+
+    return NULL;
+}
+
 const char *handle_alu_reg(Parser *p, const char *opcode, size_t opcode_len) {
     int d, s1, s2;
 
@@ -939,27 +963,28 @@ const char *handle_li(Parser *p, const char *opcode, size_t opcode_len) {
 const char *handle_la(Parser *p, const char *opcode, size_t opcode_len) {
     Parser orig = *p;
     int d;
-    bool later;
-
     skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
     skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
+    skip_trailing(p);
 
     u32 addr;
-    skip_trailing(p);
+    bool later;
     const char *err = label(p, &orig, handle_la, opcode, opcode_len, &addr,
-                            &later, reloc_hi20lo12i);
+                            &later, reloc_pcrel_hi20lo12i);
     if (later) {
         asm_emit(0, p->startline);
         asm_emit(0, p->startline);
         return NULL;
     }
     if (err) return err;
-    i32 simm = addr - (g_section->emit_idx + g_section->base);
+    i32 pc = (i32)(g_section->emit_idx + g_section->base);
+    i32 simm = (i32)addr - pc;
 
-    i32 lo = (i32)(simm << 20) >> 20;
+    i32 lo = (i32)((u32)simm << 20) >> 20;
     u32 hi = (u32)(simm - lo) >> 12;
+
     asm_emit(AUIPC(d, hi), p->startline);
     asm_emit(ADDI(d, d, lo), p->startline);
     return NULL;

@@ -63,11 +63,10 @@ static inline void shadowstack_pop() {}
 #define CSR_MIE 0x304
 #define CSR_MIP 0x344
 
-#define STATUS_SIE (1u<<1)
-#define STATUS_SPIE (1u<<5)
-#define STATUS_SPP (1u<<8)
-#define STATUS_FS_MASK (0b11<<13)
-
+#define STATUS_SIE (1u << 1)
+#define STATUS_SPIE (1u << 5)
+#define STATUS_SPP (1u << 8)
+#define STATUS_FS_MASK (0b11 << 13)
 
 ARES_ARRAY_TYPE(u8);
 ARES_ARRAY_TYPE(u32);
@@ -87,15 +86,29 @@ typedef struct {
         size_t stidx;
     } elf;
 } Extern;
+typedef struct Section Section;
 
 typedef struct {
+    Section *section;
     size_t offset;
-    size_t size;
-    size_t addend;
-    Extern *symbol;
-    size_t type;
-} Relocation;
+    size_t elf_stidx;
+} LocalLabel;
 
+typedef enum RelocationKind {
+    RELOCATION_KIND_EXTERN,
+    RELOCATION_KIND_LOCAL_LABEL
+} RelocationKind;
+
+typedef struct {
+    RelocationKind kind;
+    u32 offset;
+    i32 addend;
+    union {
+        Extern *symbol;
+        size_t local_label_idx;
+    };
+    u32 type;
+} Relocation;
 ARES_ARRAY_TYPE(Relocation);
 
 // It would be preferable not to use dedicated pointer types like SectionPtr,
@@ -118,7 +131,7 @@ typedef struct Section {
     bool super;
     bool physical;
     ARES_ARRAY(u32) by_linenum;
-} Section, *SectionPtr;
+} *SectionPtr;
 
 typedef struct LabelData {
     const char *txt;
@@ -172,6 +185,7 @@ ARES_ARRAY_TYPE(Global);
 ARES_ARRAY_TYPE(Extern);
 ARES_ARRAY_TYPE(DeferredInsn);
 ARES_ARRAY_TYPE(char);
+ARES_ARRAY_TYPE(LocalLabel);
 
 extern export Section *g_text;
 extern export Section *g_data;
@@ -183,6 +197,7 @@ extern export Section *g_mmio;
 extern ARES_ARRAY(SectionPtr) g_sections;
 extern ARES_ARRAY(LabelData) g_labels;
 extern ARES_ARRAY(Global) g_globals;
+extern ARES_ARRAY(LocalLabel) g_local_labels;
 extern ARES_ARRAY(Extern) g_externs;
 
 extern export u32 g_error_line;
