@@ -10,11 +10,18 @@
 export Section *g_text, *g_data, *g_stack, *g_kernel_text, *g_kernel_data,
     *g_mmio;
 
+typedef struct PcrelHiReloc {
+    u32 label_addr;
+    u32 dest_addr;
+} PcrelHiReloc;
+ARES_ARRAY_TYPE(PcrelHiReloc);
+
 ARES_ARRAY(SectionPtr) g_sections = ARES_ARRAY_NEW(SectionPtr);
 ARES_ARRAY(Extern) g_externs = ARES_ARRAY_NEW(Extern);
 ARES_ARRAY(LabelData) g_labels = ARES_ARRAY_NEW(LabelData);
 ARES_ARRAY(Global) g_globals = ARES_ARRAY_NEW(Global);
 ARES_ARRAY(LocalLabel) g_local_labels = ARES_ARRAY_NEW(LocalLabel);
+ARES_ARRAY(PcrelHiReloc) g_pcrel_hi_relocs = ARES_ARRAY_NEW(PcrelHiReloc);
 
 static ARES_ARRAY(DeferredInsn) g_deferred_insn = ARES_ARRAY_NEW(DeferredInsn);
 
@@ -289,7 +296,8 @@ bool parse_numeric(Parser *p, i32 *out) {
             else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
             if (digit >= base) {
                 if (whitespace(c)) break;
-                if (c == ' ' || c == '(' || c == ',' || c == '\0') break;
+                if (c == ' ' || c == '(' || c == ')' || c == ',' || c == '\0')
+                    break;
                 *p = start;
                 return false;
             }
@@ -557,118 +565,33 @@ static const char *reloc_pcrel_hi20lo12i(const char *sym, size_t sym_len) {
     return NULL;
 }
 
-const char *handle_alu_reg(Parser *p, const char *opcode, size_t opcode_len) {
-    int d, s1, s2;
-
-    skip_trailing(p);
-    if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_trailing(p);
-    if (!consume_if(p, ',')) return "Expected ,";
-
-    skip_trailing(p);
-    if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
-    skip_trailing(p);
-    if (!consume_if(p, ',')) return "Expected ,";
-
-    skip_trailing(p);
-    if ((s2 = parse_reg(p)) == -1) return "Invalid rs2";
-
-    u32 inst = 0;
-    if (str_eq_case(opcode, opcode_len, "add")) inst = ADD(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "slt")) inst = SLT(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "sltu")) inst = SLTU(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "and")) inst = AND(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "or")) inst = OR(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "xor")) inst = XOR(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "sll")) inst = SLL(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "srl")) inst = SRL(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "sub")) inst = SUB(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "sra")) inst = SRA(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "mul")) inst = MUL(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "mulh")) inst = MULH(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "mulhsu"))
-        inst = MULHSU(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "mulhu")) inst = MULHU(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "div")) inst = DIV(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "divu")) inst = DIVU(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "rem")) inst = REM(d, s1, s2);
-    else if (str_eq_case(opcode, opcode_len, "remu")) inst = REMU(d, s1, s2);
-
-    asm_emit(inst, p->startline);
+static const char *reloc_pcrel_hi20(const char *sym, size_t sym_len) {
+    Relocation *r_hi = ARES_ARRAY_PUSH(&g_section->relocations);
+    r_hi->kind = RELOCATION_KIND_EXTERN;
+    r_hi->symbol = get_extern(sym, sym_len);
+    r_hi->addend = 0;
+    r_hi->offset = g_section->emit_idx;
+    r_hi->type = R_RISCV_PCREL_HI20;
     return NULL;
 }
 
-const char *handle_alu_imm(Parser *p, const char *opcode, size_t opcode_len) {
-    int d, s1;
-    i32 simm;
-
-    skip_trailing(p);
-    if ((d = parse_reg(p)) == -1) return "Invalid rd";
-    skip_trailing(p);
-    if (!consume_if(p, ',')) return "Expected ,";
-
-    skip_trailing(p);
-    if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
-    skip_trailing(p);
-    if (!consume_if(p, ',')) return "Expected ,";
-
-    skip_trailing(p);
-
-    if (!parse_numeric(p, &simm)) return "Invalid immediate";
-    if (simm < -2048 || simm > 2047) return "Out of bounds immediate";
-    bool is_shift = str_eq_case(opcode, opcode_len, "slli") ||
-                    str_eq_case(opcode, opcode_len, "srli") ||
-                    str_eq_case(opcode, opcode_len, "srai");
-    if (is_shift && (simm < 0 || simm >= 32)) return "Invalid shift immediate";
-
-    u32 inst = 0;
-    if (str_eq_case(opcode, opcode_len, "addi")) inst = ADDI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "slti")) inst = SLTI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "sltiu"))
-        inst = SLTIU(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "andi")) inst = ANDI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "ori")) inst = ORI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "xori")) inst = XORI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "slli")) inst = SLLI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "srli")) inst = SRLI(d, s1, simm);
-    else if (str_eq_case(opcode, opcode_len, "srai")) inst = SRAI(d, s1, simm);
-
-    asm_emit(inst, p->startline);
-
+static const char *reloc_pcrel_lo12i(const char *sym, size_t sym_len) {
+    Relocation *r_lo = ARES_ARRAY_PUSH(&g_section->relocations);
+    r_lo->kind = RELOCATION_KIND_EXTERN;
+    r_lo->symbol = get_extern(sym, sym_len);
+    r_lo->addend = 0;
+    r_lo->offset = g_section->emit_idx;
+    r_lo->type = R_RISCV_PCREL_LO12_I;
     return NULL;
 }
 
-const char *handle_ldst(Parser *p, const char *opcode, size_t opcode_len) {
-    int reg, mem;
-    i32 simm;
-
-    skip_trailing(p);
-    if ((reg = parse_reg(p)) == -1) return "Invalid rreg";
-    skip_trailing(p);
-    if (!consume_if(p, ',')) return "Expected ,";
-
-    skip_trailing(p);
-    if (!parse_numeric(p, &simm)) return "Invalid immediate";
-    if (simm < -2048 || simm > 2047) return "Out of bounds immediate";
-
-    skip_trailing(p);
-    if (!consume_if(p, '(')) return "Expected (";
-    skip_trailing(p);
-    if ((mem = parse_reg(p)) == -1) return "Invalid rmem";
-    skip_trailing(p);
-    if (!consume_if(p, ')')) return "Expected )";
-
-    u32 inst = 0;
-    if (str_eq_case(opcode, opcode_len, "lb")) inst = LB(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "lh")) inst = LH(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "lw")) inst = LW(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "lbu")) inst = LBU(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "lhu")) inst = LHU(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "sb")) inst = SB(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "sh")) inst = SH(reg, mem, simm);
-    else if (str_eq_case(opcode, opcode_len, "sw")) inst = SW(reg, mem, simm);
-
-    asm_emit(inst, p->startline);
+static const char *reloc_pcrel_lo12s(const char *sym, size_t sym_len) {
+    Relocation *r_lo = ARES_ARRAY_PUSH(&g_section->relocations);
+    r_lo->kind = RELOCATION_KIND_EXTERN;
+    r_lo->symbol = get_extern(sym, sym_len);
+    r_lo->addend = 0;
+    r_lo->offset = g_section->emit_idx;
+    r_lo->type = R_RISCV_PCREL_LO12_S;
     return NULL;
 }
 
@@ -712,6 +635,241 @@ const char *label(Parser *p, Parser *orig, DeferredInsnCb *cb,
     insn->opcode_len = opcode_len;
     insn->section = g_section;
     *later = true;
+    return NULL;
+}
+
+const char *parse_modifier_hi(Parser *p, Parser orig, DeferredInsnCb *cb,
+                              const char *opcode, size_t opcode_len,
+                              i32 *simm) {
+    const char *modifier;
+    size_t modifier_len;
+    u32 addr;
+    i32 num;
+    parse_ident(p, &modifier, &modifier_len);
+    if (!consume_if(p, '(')) return "Expected (";
+    DeferredInsnReloc *reloc = NULL;
+    if (str_eq_case(modifier, modifier_len, "hi")) reloc = reloc_hi20;
+    else if (str_eq_case(modifier, modifier_len, "pcrel_hi"))
+        reloc = reloc_pcrel_hi20;
+    else return "Invalid modifier";
+
+    if (parse_numeric(p, &num)) {
+        addr = num;
+    } else {
+        bool later;
+        const char *err =
+            label(p, &orig, cb, opcode, opcode_len, &addr, &later, reloc);
+        if (err) return err;
+        if (later) {
+            if (!consume_if(p, ')')) return "Expected )";
+            *simm = 0;
+            return NULL;
+        }
+    }
+    if (!consume_if(p, ')')) return "Expected )";
+    if (reloc == reloc_pcrel_hi20) {
+        *ARES_ARRAY_PUSH(&g_pcrel_hi_relocs) =
+            (PcrelHiReloc){.label_addr = g_section->emit_idx + g_section->base,
+                           .dest_addr = addr};
+        addr -= g_section->emit_idx + g_section->base;
+    }
+    i32 lo = (i32)((u32)addr << 20) >> 20;
+    u32 hi = (u32)(addr - lo) >> 12;
+    *simm = hi;
+    return NULL;
+}
+
+const char *parse_modifier_lo(Parser *p, Parser orig, bool is_i,
+                              DeferredInsnCb *cb, const char *opcode,
+                              size_t opcode_len, i32 *simm) {
+    const char *modifier;
+    size_t modifier_len;
+    u32 addr;
+    i32 num;
+    parse_ident(p, &modifier, &modifier_len);
+    if (!consume_if(p, '(')) return "Expected (";
+    DeferredInsnReloc *reloc = NULL;
+    if (str_eq_case(modifier, modifier_len, "lo"))
+        reloc = is_i ? reloc_lo12i : reloc_lo12s;
+    else if (str_eq_case(modifier, modifier_len, "pcrel_lo"))
+        reloc = is_i ? reloc_pcrel_lo12i : reloc_pcrel_lo12s;
+    else return "Invalid modifier";
+
+    if (parse_numeric(p, &num)) {
+        addr = num;
+    } else {
+        bool later;
+        const char *err =
+            label(p, &orig, cb, opcode, opcode_len, &addr, &later, reloc);
+        if (err) return err;
+        if (later) {
+            if (!consume_if(p, ')')) return "Expected )";
+            *simm = 0;
+            return NULL;
+        }
+    }
+    if (!consume_if(p, ')')) return "Expected )";
+    if (reloc == reloc_pcrel_lo12i || reloc == reloc_pcrel_lo12s) {
+        bool found = false;
+        for (size_t i = 0; i < g_pcrel_hi_relocs.len; i++) {
+            if (g_pcrel_hi_relocs.buf[i].label_addr == addr) {
+                addr = g_pcrel_hi_relocs.buf[i].dest_addr - addr;
+                found = true;
+            }
+        }
+        if (!found) {
+            if (!g_in_fixup) {
+                DeferredInsn *insn = ARES_ARRAY_PUSH(&g_deferred_insn);
+                insn->emit_idx = g_section->emit_idx;
+                insn->p = orig;
+                insn->cb = cb;
+                insn->reloc = reloc;
+                insn->opcode = opcode;
+                insn->opcode_len = opcode_len;
+                insn->section = g_section;
+                *simm = 0;
+                return NULL;
+            } else {
+                // TODO: this also includes places where it is in a weird order
+                // like this:
+                // addi a0, a0, %pcrel_lo(l0)
+                // l0:
+                // auipc a0, %pcrel_hi(label)
+                // label:
+                return "Invalid pcrel label";
+            }
+        }
+    }
+    i32 lo = (i32)((u32)addr << 20) >> 20;
+    *simm = lo;
+    return NULL;
+}
+
+const char *handle_alu_reg(Parser *p, const char *opcode, size_t opcode_len) {
+    int d, s1, s2;
+
+    skip_trailing(p);
+    if ((d = parse_reg(p)) == -1) return "Invalid rd";
+    skip_trailing(p);
+    if (!consume_if(p, ',')) return "Expected ,";
+
+    skip_trailing(p);
+    if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
+    skip_trailing(p);
+    if (!consume_if(p, ',')) return "Expected ,";
+
+    skip_trailing(p);
+    if ((s2 = parse_reg(p)) == -1) return "Invalid rs2";
+
+    u32 inst = 0;
+    if (str_eq_case(opcode, opcode_len, "add")) inst = ADD(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "slt")) inst = SLT(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "sltu")) inst = SLTU(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "and")) inst = AND(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "or")) inst = OR(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "xor")) inst = XOR(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "sll")) inst = SLL(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "srl")) inst = SRL(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "sub")) inst = SUB(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "sra")) inst = SRA(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "mul")) inst = MUL(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "mulh")) inst = MULH(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "mulhsu"))
+        inst = MULHSU(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "mulhu")) inst = MULHU(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "div")) inst = DIV(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "divu")) inst = DIVU(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "rem")) inst = REM(d, s1, s2);
+    else if (str_eq_case(opcode, opcode_len, "remu")) inst = REMU(d, s1, s2);
+
+    asm_emit(inst, p->startline);
+    return NULL;
+}
+
+const char *handle_alu_imm(Parser *p, const char *opcode, size_t opcode_len) {
+    Parser orig = *p;
+    int d, s1;
+    i32 simm;
+
+    skip_trailing(p);
+    if ((d = parse_reg(p)) == -1) return "Invalid rd";
+    skip_trailing(p);
+    if (!consume_if(p, ',')) return "Expected ,";
+
+    skip_trailing(p);
+    if ((s1 = parse_reg(p)) == -1) return "Invalid rs1";
+    skip_trailing(p);
+    if (!consume_if(p, ',')) return "Expected ,";
+
+    skip_trailing(p);
+    if (consume_if(p, '%')) {
+        const char *err = parse_modifier_lo(p, orig, true, handle_alu_imm,
+                                            opcode, opcode_len, &simm);
+        if (err) return err;
+    } else if (!parse_numeric(p, &simm)) return "Invalid immediate";
+    if (simm < -2048 || simm > 2047) return "Out of bounds immediate";
+    bool is_shift = str_eq_case(opcode, opcode_len, "slli") ||
+                    str_eq_case(opcode, opcode_len, "srli") ||
+                    str_eq_case(opcode, opcode_len, "srai");
+    if (is_shift && (simm < 0 || simm >= 32)) return "Invalid shift immediate";
+    u32 inst = 0;
+    if (str_eq_case(opcode, opcode_len, "addi")) inst = ADDI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "slti")) inst = SLTI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "sltiu"))
+        inst = SLTIU(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "andi")) inst = ANDI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "ori")) inst = ORI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "xori")) inst = XORI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "slli")) inst = SLLI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "srli")) inst = SRLI(d, s1, simm);
+    else if (str_eq_case(opcode, opcode_len, "srai")) inst = SRAI(d, s1, simm);
+
+    asm_emit(inst, p->startline);
+
+    return NULL;
+}
+
+const char *handle_ldst(Parser *p, const char *opcode, size_t opcode_len) {
+    Parser orig = *p;
+    int reg, mem;
+    i32 simm;
+
+    bool store = str_eq_case(opcode, opcode_len, "sb") ||
+                 str_eq_case(opcode, opcode_len, "sh") ||
+                 str_eq_case(opcode, opcode_len, "sw");
+
+    skip_trailing(p);
+    if ((reg = parse_reg(p)) == -1) return "Invalid rreg";
+    skip_trailing(p);
+    if (!consume_if(p, ',')) return "Expected ,";
+
+    skip_trailing(p);
+
+    if (consume_if(p, '%')) {
+        const char *err = parse_modifier_lo(p, orig, !store, handle_ldst,
+                                            opcode, opcode_len, &simm);
+        if (err) return err;
+    } else if (!parse_numeric(p, &simm)) return "Invalid immediate";
+    if (simm < -2048 || simm > 2047) return "Out of bounds immediate";
+
+    skip_trailing(p);
+    if (!consume_if(p, '(')) return "Expected (";
+    skip_trailing(p);
+    if ((mem = parse_reg(p)) == -1) return "Invalid rmem";
+    skip_trailing(p);
+    if (!consume_if(p, ')')) return "Expected )";
+
+    u32 inst = 0;
+    if (str_eq_case(opcode, opcode_len, "lb")) inst = LB(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "lh")) inst = LH(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "lw")) inst = LW(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "lbu")) inst = LBU(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "lhu")) inst = LHU(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "sb")) inst = SB(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "sh")) inst = SH(reg, mem, simm);
+    else if (str_eq_case(opcode, opcode_len, "sw")) inst = SW(reg, mem, simm);
+
+    asm_emit(inst, p->startline);
     return NULL;
 }
 
@@ -917,6 +1075,7 @@ const char *handle_ret(Parser *p, const char *opcode, size_t opcode_len) {
 }
 
 const char *handle_upper(Parser *p, const char *opcode, size_t opcode_len) {
+    Parser orig = *p;
     int d;
     i32 simm;
     u32 inst = 0;
@@ -926,10 +1085,14 @@ const char *handle_upper(Parser *p, const char *opcode, size_t opcode_len) {
     skip_trailing(p);
     if (!consume_if(p, ',')) return "Expected ,";
     skip_trailing(p);
-    if (!parse_numeric(p, &simm)) return "Invalid immediate";
+    if (consume_if(p, '%')) {
+        const char *err =
+            parse_modifier_hi(p, orig, handle_upper, opcode, opcode_len, &simm);
+        if (err) return err;
+    } else if (!parse_numeric(p, &simm)) return "Invalid immediate";
     // the immediate can either be signed or unsigned 20 bit
     if (simm < -524288 || simm > 1048575) return "Out of bounds immediate";
-
+    
     if (str_eq_case(opcode, opcode_len, "lui")) inst = LUI(d, simm);
     else if (str_eq_case(opcode, opcode_len, "auipc")) inst = AUIPC(d, simm);
 
