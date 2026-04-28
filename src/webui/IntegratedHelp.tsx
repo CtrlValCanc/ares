@@ -182,6 +182,14 @@ seqz rd, rs1
 (sltiu rd, rs1, 1)
 rd = (rs1 == 0) ? 1 : 0
 
+sext.b rd, rs1
+(slli rd, rs1, 24; srai rd, rd, 24)
+rd = (int32_t)((int8_t)rs1[7:0])
+
+sext.h rd, rs1
+(slli rd, rs1, 16; srai rd, rd, 16)
+rd = (int32_t)((int16_t)rs1[15:0])
+
 sgtz rd, rs1
 (slt rd, zero, rs1)
 rd = (rs1 > 0) ? 1 : 0
@@ -202,7 +210,7 @@ slti rd, rs1, imm
 rd = (rs1 < imm) ? 1 : 0 (signed)
 
 sltiu rd, rs1, imm
-rd = (rs1 < (uint32_t)sext(imm)) ? 1 : 0 (unsigned, ***)
+rd = (rs1 < sext(imm)) ? 1 : 0 (unsigned, ***)
 
 sltu rd, rs1, rs2
 rd = (rs1 < rs2) ? 1 : 0 (unsigned)
@@ -237,7 +245,15 @@ xor rd, rs1, rs2
 rd = rs1 ^ rs2 
 
 xori rd, rs1, imm
-rd = rs1 ^ imm 
+rd = rs1 ^ imm
+
+zext.b rd, rs1
+(andi rd, rs1, 0xFF)
+rd = rs1[7:0]
+
+zext.h rd, rs1
+(slli rd, rs1, 16; srli rd, rd, 16)
+rd = rs1[15:0]
 `;
 
 const asterisks = `
