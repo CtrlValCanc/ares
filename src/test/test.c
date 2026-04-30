@@ -336,6 +336,31 @@ void test_jalr_4(void) {
     TEST_ASSERT_EQUAL(0x00628267, LOAD(g_text->base, 4, &err));
 }
 
+void test_data_label_1(void) {
+    bool err = false;
+    assemble_line(".data\nhi: .word label\n.text\nlabel:\nnop");
+    TEST_ASSERT_EQUAL(TEXT_BASE, LOAD(g_data->base, 4, &err));
+}
+
+void test_data_label_2(void) {
+    bool err = false;
+    assemble_line(".text\nlabel:\nnop\n.data\nhi: .word label\n");
+    TEST_ASSERT_EQUAL(TEXT_BASE, LOAD(g_data->base, 4, &err));
+}
+
+void test_data_label_3(void) {
+    bool err = false;
+    assemble_line(".text\nlabel:\nnop\n.data\nhi: .word labelNotFound\n");
+    TEST_ASSERT_EQUAL_STRING(g_error, "Invalid word");
+}
+
+void test_data_label_4(void) {
+    bool err = false;
+    assemble_line(".data\nhi: .word label, 2\n.text\nlabel:\nnop");
+    TEST_ASSERT_EQUAL(TEXT_BASE, LOAD(g_data->base, 4, &err));
+    TEST_ASSERT_EQUAL(2, LOAD(g_data->base + 4, 4, &err));
+}
+
 void test_parse_string_bad_escape(void) {
     assemble_line(".data\n.asciz \"hello\\q\"");
     TEST_ASSERT_EQUAL_STRING(g_error, "Invalid string");

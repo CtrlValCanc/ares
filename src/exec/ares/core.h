@@ -157,7 +157,6 @@ typedef struct DeferredInsn {
     Parser p;
     Section *section;
     DeferredInsnCb *cb;
-    DeferredInsnReloc *reloc;
     const char *opcode;
     size_t opcode_len;
     size_t emit_idx;
@@ -264,5 +263,5 @@ enum Reg {
 bool parse_numeric(Parser *p, i32 *out);
 bool parse_quoted_str(Parser *p, char **out_str, size_t *out_len);
 void skip_whitespace(Parser *p);
-void parse_ident(Parser *p, const char **str, size_t *len);
+bool parse_ident(Parser *p, const char **str, size_t *len);
 bool skip_comment(Parser *p);

@@ -251,6 +251,11 @@ bool whitespace(char c) {
 bool trailing(char c) { return c == '\t' || c == ' '; }
 
 bool digit(char c) { return (c >= '0' && c <= '9'); }
+bool ident_first(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_') ||
+           (c == '.');
+}
+
 bool ident(char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
            (c >= 'A' && c <= 'Z') || (c == '_') || (c == '.');
@@ -350,12 +355,21 @@ bool consume(Parser *p, char *c) {
     return true;
 }
 
-void parse_ident(Parser *p, const char **str, size_t *len) {
+bool parse_ident(Parser *p, const char **str, size_t *len) {
     size_t start = p->pos;
-    while (p->pos < p->size && ident(p->input[p->pos])) advance(p);
+    if (p->pos >= p->size) {
+        *len = 0;
+        return false;
+    }
+    if (!ident_first(peek(p))) {
+        *len = 0;
+        return false;
+    }
+    while (ident(peek(p))) advance(p);
     size_t end = p->pos;
     *str = p->input + start;
     *len = end - start;
+    return true;
 }
 
 bool str_eq(const char *txt, size_t len, const char *c) {
@@ -394,9 +408,15 @@ bool parse_numeric(Parser *p, i32 *out) {
 
     if (consume_if(p, '\'')) {
         char c;
-        if (!consume(p, &c)) return false;
+        if (!consume(p, &c)) {
+            *p = start;
+            return false;
+        }
         if (c == '\\') {
-            if (!consume(p, &c)) return false;
+            if (!consume(p, &c)) {
+                *p = start;
+                return false;
+            }
             if (c == 'n') c = '\n';
             else if (c == 't') c = '\t';
             else if (c == 'r') c = '\r';
@@ -408,10 +428,16 @@ bool parse_numeric(Parser *p, i32 *out) {
             else if (c == '\'') c = '\'';
             else if (c == '"') c = '"';
             else if (c == '0') c = 0;
-            else return false;
+            else {
+                *p = start;
+                return false;
+            }
         }
         value = (unsigned char)c;
-        if (!consume_if(p, '\'')) return false;
+        if (!consume_if(p, '\'')) {
+            *p = start;
+            return false;
+        }
     } else {
         if (peek(p) == '0') {
             char prefix = peek_n(p, 1);
@@ -436,7 +462,10 @@ bool parse_numeric(Parser *p, i32 *out) {
             value = value * base + digit;
             // by giving an extremely long number
             // the user could overflow the i64 too
-            if (value > 4294967295) return false;
+            if (value > 4294967295) {
+                *p = start;
+                return false;
+            }
             advance(p);
         }
         if (!parsed_digit) {
@@ -446,6 +475,7 @@ bool parse_numeric(Parser *p, i32 *out) {
     }
     if (negative) value = -value;
     if (value < -2147483648LL || value > 4294967295LL) {
+        *p = start;
         return false;
     }
     *out = value;
@@ -768,7 +798,6 @@ const char *label(Parser *p, Parser *orig, DeferredInsnCb *cb,
     insn->emit_idx = g_section->emit_idx;
     insn->p = *orig;
     insn->cb = cb;
-    insn->reloc = reloc;
     insn->opcode = opcode;
     insn->opcode_len = opcode_len;
     insn->section = g_section;
@@ -878,7 +907,6 @@ const char *parse_modifier_lo(Parser *p, Parser orig, bool is_i,
                 insn->emit_idx = g_section->emit_idx;
                 insn->p = orig;
                 insn->cb = cb;
-                insn->reloc = reloc;
                 insn->opcode = opcode;
                 insn->opcode_len = opcode_len;
                 insn->section = g_section;
@@ -2038,6 +2066,64 @@ static void prepare_default_syms(void) {
 #undef MMIO_LABEL
 }
 
+// .word can contain labels, and labels may come later in the text
+// and also, .word can get an array
+// so, to simplify the deferred instruction code
+// i make so that a word is always filled in the fixup phase
+// where all the label positions are certain
+const char *parse_word(Parser *p, const char *opcode, size_t opcode_len) {
+    Parser orig = *p;
+
+    if (!g_in_fixup) {
+        DeferredInsn *insn = ARES_ARRAY_PUSH(&g_deferred_insn);
+        insn->emit_idx = g_section->emit_idx;
+        insn->p = orig;
+        insn->cb = parse_word;
+        insn->opcode = opcode;
+        insn->opcode_len = opcode_len;
+        insn->section = g_section;
+
+        bool first = true;
+        while (true) {
+            skip_whitespace(p);
+            if (!first && !consume_if(p, ',')) break;
+            first = false;
+            skip_whitespace(p);
+
+            i32 dummy;
+            if (!parse_numeric(p, &dummy)) {
+                const char *tok;
+                size_t tok_len;
+                if (!parse_ident(p, &tok, &tok_len) || tok_len == 0)
+                    return "Invalid word";
+            }
+            asm_emit(0, p->startline);
+        }
+        return NULL;
+    }
+
+    bool first = true;
+    while (true) {
+        skip_whitespace(p);
+        if (!first && !consume_if(p, ',')) break;
+        first = false;
+        skip_whitespace(p);
+
+        i32 value;
+        if (parse_numeric(p, &value)) {
+            asm_emit(value, p->startline);
+        } else {
+            bool later;
+            u32 addr;
+            const char *err = label(p, &orig, parse_word, opcode, opcode_len,
+                                    &addr, &later, reloc_abs32);
+            if (err) return "Invalid word";
+            asm_emit((i32)addr, p->startline);
+        }
+    }
+    return NULL;
+}
+
 /*
     NOTE: both binutils and RARS do not support instructions spanning more
    lines, like "li a0,\n93" But RARS does support it for .byte etc, so for
@@ -2212,20 +2298,8 @@ export void assemble(const char *txt, size_t s, bool allow_externs) {
                 }
                 continue;
             } else if (str_eq_case(directive, directive_len, "word")) {
-                i32 value;
-                bool first = true;
-                while (true) {
-                    skip_whitespace(p);
-                    if (first || consume_if(p, ',')) {
-                        skip_whitespace(p);
-                        if (!parse_numeric(p, &value)) {
-                            err = "Invalid word";
-                            break;
-                        }
-                        asm_emit(value, p->startline);
-                    } else break;
-                    first = false;
-                }
+                err = parse_word(p, "word", 4);
+                if (err) break;
                 continue;
             } else if (str_eq_case(directive, directive_len, "ascii")) {
                 char *out;
@@ -2526,5 +2600,6 @@ void free_runtime(void) {
     ARES_ARRAY_FREE(&g_deferred_insn);
     ARES_ARRAY_FREE(&g_globals);
     ARES_ARRAY_FREE(&g_externs);
+    ARES_ARRAY_FREE(&g_pcrel_hi_relocs);
     ARES_ARRAY_FREE(&g_shadow_stack);
 }
