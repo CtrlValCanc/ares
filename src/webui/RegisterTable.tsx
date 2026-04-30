@@ -7,41 +7,41 @@ export const [unitSize, setUnitSize] = createSignal<UnitSize>(4);
 export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: number }> = (props) => {
   // idx is the hardware register number
   const registersLayout = [
-    { name: "ra",  idx: 1,  color: "theme-style1" }, 
-    { name: "sp",  idx: 2,  color: "theme-style1" },
-    { name: "fp",  idx: 8,  color: "theme-style1" },
+    { name: "ra", idx: 1, color: "theme-style1" },
+    { name: "sp", idx: 2, color: "theme-style1" },
 
-    { name: "t0",  idx: 5,  color: "theme-style2" }, 
-    { name: "t1",  idx: 6,  color: "theme-style2" }, 
-    { name: "t2",  idx: 7,  color: "theme-style2" },
-    { name: "t3",  idx: 28, color: "theme-style2" }, 
-    { name: "t4",  idx: 29, color: "theme-style2" }, 
-    { name: "t5",  idx: 30, color: "theme-style2" }, 
-    { name: "t6",  idx: 31, color: "theme-style2" },
-    
-    { name: "a0",  idx: 10, color: "theme-style5" }, 
-    { name: "a1",  idx: 11, color: "theme-style5" }, 
-    { name: "a2",  idx: 12, color: "theme-style5" }, 
-    { name: "a3",  idx: 13, color: "theme-style5" },
-    { name: "a4",  idx: 14, color: "theme-style5" }, 
-    { name: "a5",  idx: 15, color: "theme-style5" }, 
-    { name: "a6",  idx: 16, color: "theme-style5" }, 
-    { name: "a7",  idx: 17, color: "theme-style5" },
+    { name: "t0", idx: 5, color: "theme-style2" },
+    { name: "t1", idx: 6, color: "theme-style2" },
+    { name: "t2", idx: 7, color: "theme-style2" },
+    { name: "t3", idx: 28, color: "theme-style2" },
+    { name: "t4", idx: 29, color: "theme-style2" },
+    { name: "t5", idx: 30, color: "theme-style2" },
+    { name: "t6", idx: 31, color: "theme-style2" },
 
-    { name: "s1",  idx: 9,  color: "theme-style7" }, 
-    { name: "s2",  idx: 18, color: "theme-style7" }, 
-    { name: "s3",  idx: 19, color: "theme-style7" }, 
-    { name: "s4",  idx: 20, color: "theme-style7" },
-    { name: "s5",  idx: 21, color: "theme-style7" }, 
-    { name: "s6",  idx: 22, color: "theme-style7" }, 
-    { name: "s7",  idx: 23, color: "theme-style7" }, 
-    { name: "s8",  idx: 24, color: "theme-style7" },
-    { name: "s9",  idx: 25, color: "theme-style7" }, 
-    { name: "s10", idx: 26, color: "theme-style7" }, 
+    { name: "a0", idx: 10, color: "theme-style5" },
+    { name: "a1", idx: 11, color: "theme-style5" },
+    { name: "a2", idx: 12, color: "theme-style5" },
+    { name: "a3", idx: 13, color: "theme-style5" },
+    { name: "a4", idx: 14, color: "theme-style5" },
+    { name: "a5", idx: 15, color: "theme-style5" },
+    { name: "a6", idx: 16, color: "theme-style5" },
+    { name: "a7", idx: 17, color: "theme-style5" },
+
+    { name: "s0/fp", idx: 8, color: "theme-style7" },
+    { name: "s1", idx: 9, color: "theme-style7" },
+    { name: "s2", idx: 18, color: "theme-style7" },
+    { name: "s3", idx: 19, color: "theme-style7" },
+    { name: "s4", idx: 20, color: "theme-style7" },
+    { name: "s5", idx: 21, color: "theme-style7" },
+    { name: "s6", idx: 22, color: "theme-style7" },
+    { name: "s7", idx: 23, color: "theme-style7" },
+    { name: "s8", idx: 24, color: "theme-style7" },
+    { name: "s9", idx: 25, color: "theme-style7" },
+    { name: "s10", idx: 26, color: "theme-style7" },
     { name: "s11", idx: 27, color: "theme-style7" },
-    
-    { name: "gp",  idx: 3,  color: "" },
-    { name: "tp",  idx: 4,  color: "" },
+
+    { name: "gp", idx: 3, color: "" },
+    { name: "tp", idx: 4, color: "" },
   ];
 
   // setting ascii will force unit size to byte
@@ -61,9 +61,8 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
       setDisplayFormat("hex");
     }
   };
-  // all units being ch makes so that the precise sum is 1ch (left pad) + 7ch (x27/a10) + 10ch (0xdeadbeef) + 1ch (right pad)
-  // round to 20ch so it has some padding between regname and hex
-  // now i have the precise size in a font-independent format, as long as it's monospace
+  // 21ch as it's the size of the largest column (" s0/fp/x8 0x00000000 ")
+  // it is precise as it is in monospace
   // webkit workaround for lack of select styling (particularly apparent in dark mode)
   // using google material icons keyboard_arrow_down as it matches Chromium's native
   return (
@@ -104,7 +103,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
 
       {/* Register grid */}
       <div class="overflow-auto flex-grow text-md theme-mono theme-scrollbar-slim theme-border whitespace-nowrap">
-        <div class="columns-[20ch] gap-0 min-w-max theme-border-column-rule">
+        <div class="columns-[21ch] gap-0 min-w-max theme-border-column-rule">
           <div class="justify-between flex flex-row box-content theme-border py-[0.5ch]">
             <div class="self-center pl-[1ch] font-bold">pc</div>
             <div class="self-center pr-[1ch]">{formatRegister(props.pc, "hex")}</div>
@@ -127,7 +126,7 @@ export const RegisterTable: Component<{ pc: number, regs: number[], regWritten: 
               </div>
             );
           })}
-        </div>        
+        </div>
       </div>
     </div>
   );
