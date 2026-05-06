@@ -1496,7 +1496,22 @@ u32 emu_load(u32 addr, int size) {
 
 char g_emu_disassemble_buf[64];
 
-size_t emu_disassemble(u32 inst) {
+size_t emu_disassemble_addr(u32 addr) {
+    bool err = false;
+    u32 inst = LOAD(addr, 2, &err);
+    if (err) {
+        g_emu_disassemble_buf[0] = '\0';
+        return 0;
+    }
+
+    if ((inst & 0b11) == 0b11) {
+        inst = LOAD(addr, 4, &err);
+        if (err) {
+            g_emu_disassemble_buf[0] = '\0';
+            return 0;
+        }
+    }
+
     return disassemble(inst, g_emu_disassemble_buf, 64);
 }
 

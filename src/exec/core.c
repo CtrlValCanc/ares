@@ -358,10 +358,12 @@ bool consume(Parser *p, char *c) {
 bool parse_ident(Parser *p, const char **str, size_t *len) {
     size_t start = p->pos;
     if (p->pos >= p->size) {
+        *str = NULL;
         *len = 0;
         return false;
     }
     if (!ident_first(peek(p))) {
+        *str = NULL;
         *len = 0;
         return false;
     }
@@ -970,7 +972,7 @@ const char *handle_alu_reg(Parser *p, const char *opcode, size_t opcode_len) {
 }
 
 const char *handle_ext(Parser *p, const char *opcode, size_t opcode_len) {
-    int d, s1, s2;
+    int d, s1;
 
     skip_trailing(p);
     if ((d = parse_reg(p)) == -1) return "Invalid rd";
@@ -2114,7 +2116,7 @@ const char *parse_word(Parser *p, const char *opcode, size_t opcode_len) {
             asm_emit(value, p->startline);
         } else {
             bool later;
-            u32 addr;
+            u32 addr = 0;
             const char *err = label(p, &orig, parse_word, opcode, opcode_len,
                                     &addr, &later, reloc_abs32);
             if (err) return "Invalid word";
@@ -2222,7 +2224,10 @@ export void assemble(const char *txt, size_t s, bool allow_externs) {
         if (consume_if(p, '.')) {
             const char *directive;
             size_t directive_len;
-            parse_ident(p, &directive, &directive_len);
+            if (!parse_ident(p, &directive, &directive_len)) {
+                err = "Invalid directive";
+                break;
+            }                
             skip_trailing(p);
 
             if (str_eq_case(directive, directive_len, "section")) {

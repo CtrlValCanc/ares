@@ -44,7 +44,7 @@ interface WasmExports {
   g_get_addr_from_line_start: number;
   g_get_addr_from_line_end: number;
   emu_load: (addr: number, size: number) => number;
-  emu_disassemble: (addr: number) => number;
+  emu_disassemble_addr: (addr: number) => number;
   __heap_base: number;
   g_regs: number;
   g_heap_size: number;
@@ -217,8 +217,7 @@ export class WasmInterface {
 
 
   disassemble(pc: number): string {
-    const inst = this.exports.emu_load(pc, 4);
-    const len = this.exports.emu_disassemble(inst);
+    const len = this.exports.emu_disassemble_addr(pc);
     const arr = this.createU8(this.exports.g_emu_disassemble_buf);
     const str = new TextDecoder("utf8").decode(arr.slice(0, len));
     return str;
