@@ -873,9 +873,11 @@ bool elf_load(u8 *elf_contents, size_t elf_len, char **error) {
         s->align = s_hdr->align;
         s->base = s_hdr->virt_addr;
         s->contents.cap = s->contents.len = s_hdr->mem_sz;
-        s->contents.buf = malloc(s->contents.len);
+        s->contents.buf = calloc(1, s->contents.len);
         ARES_CHECK_OOM(s->contents.buf);
-        memcpy(s->contents.buf, elf_contents + s_hdr->off, s->contents.len);
+        if (s_hdr->type != SHT_NOBITS) 
+            memcpy(s->contents.buf, elf_contents + s_hdr->off, s->contents.len);
+        
         s->limit = s->base + s->contents.len;
 
         if (s_hdr->name_off >= str_tab_len) {
