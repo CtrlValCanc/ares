@@ -180,11 +180,18 @@ void do_syscall(void) {
         for (size_t i = 0; i < len; i++) putchar(buffer[i]);
     } else if (g_regs[17] == 4) {
         // print string
+        // TODO: a common student bug is to use .ascii instead of .asciz/.string
+        // which may result in reading after the end of the data section
+        // currently it just returns the raw load error
         u32 i = 0;
         while (1) {
             bool err = false;
             u8 ch = LOAD(param + i, 1, &err);
-            if (err) return;  // TODO: return an error?
+            if (err) {
+                g_runtime_error_type = ERROR_LOAD;
+                g_runtime_error_params[0] = param + i;
+                return;
+            }
             if (ch == 0) break;
             i++;
             putchar(ch);
