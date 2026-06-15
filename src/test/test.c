@@ -1399,9 +1399,9 @@ _start:                \n\
     ecall              \n\
 fun:                   \n\
     c.addi16sp sp, -16 \n\
-    c.swsp a0, 0       \n\
+    c.swsp a0, 0(sp)   \n\
     li a0, 123456      \n\
-    c.lwsp a0, 0       \n\
+    c.lwsp a0, 0(sp)   \n\
     c.addi16sp sp, 16  \n\
     c.jr ra            \n\
 ");

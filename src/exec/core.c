@@ -1455,7 +1455,7 @@ const char *handle_csr_imm(Parser *p, const char *opcode, size_t opcode_len) {
 // compressed handlers
 
 const char *handle_c_lwsp(Parser *p, const char *opcode, size_t opcode_len) {
-    Reg d;
+    Reg d, s;
     i32 simm;
 
     skip_trailing(p);
@@ -1470,12 +1470,22 @@ const char *handle_c_lwsp(Parser *p, const char *opcode, size_t opcode_len) {
     if (simm < 0 || simm > 255) return "Out of bounds immediate";
     if (simm % 4 != 0) return "Immediate must be a multiple of 4";
 
+    skip_trailing(p);
+    if (!consume_if(p, '(')) return "Expected (";
+
+    skip_trailing(p);
+    if ((s = parse_reg(p)) == -1) return "Invalid rs1";
+    if (s != REG_SP) return "register must be sp";
+
+    skip_trailing(p);
+    if (!consume_if(p, ')')) return "Expected )";
+
     asm_emit_16(C_LWSP(d, simm), p->startline);
     return NULL;
 }
 
 const char *handle_c_swsp(Parser *p, const char *opcode, size_t opcode_len) {
-    Reg s2;
+    Reg s2, s;
     i32 simm;
 
     skip_trailing(p);
@@ -1488,6 +1498,16 @@ const char *handle_c_swsp(Parser *p, const char *opcode, size_t opcode_len) {
     if (!parse_numeric(p, &simm)) return "Invalid immediate";
     if (simm < 0 || simm > 255) return "Out of bounds immediate";
     if (simm % 4 != 0) return "Immediate must be a multiple of 4";
+
+    skip_trailing(p);
+    if (!consume_if(p, '(')) return "Expected (";
+
+    skip_trailing(p);
+    if ((s = parse_reg(p)) == -1) return "Invalid rs1";
+    if (s != REG_SP) return "register must be sp";
+
+    skip_trailing(p);
+    if (!consume_if(p, ')')) return "Expected )";
 
     asm_emit_16(C_SWSP(s2, simm), p->startline);
     return NULL;
@@ -2227,7 +2247,7 @@ export void assemble(const char *txt, size_t s, bool allow_externs) {
             if (!parse_ident(p, &directive, &directive_len)) {
                 err = "Invalid directive";
                 break;
-            }                
+            }
             skip_trailing(p);
 
             if (str_eq_case(directive, directive_len, "section")) {
