@@ -852,49 +852,58 @@ bool elf_load(u8 *elf_contents, size_t elf_len, char **error) {
         return false;
     }
 
-    // ElfProgramHeader *phdrs =
-    //     (ElfProgramHeader *)(elf_contents + e_header->phdrs_off);
-    ElfSectionHeader *shdrs =
-        (ElfSectionHeader *)(elf_contents + e_header->shdrs_off);
+    // Check bounds for program headers array
+    size_t phdrs_end =
+        e_header->phdrs_off + (e_header->phent_num * sizeof(ElfProgramHeader));
+    if (phdrs_end > elf_len) {
+        *error = "program headers out of bounds";
+        return false;
+    }
 
-    ElfSectionHeader *str_tab_shdr = &shdrs[e_header->shdr_str_idx];
-    char *str_tab = (char *)(elf_contents + str_tab_shdr->off);
-    u32 str_tab_len = str_tab_shdr->mem_sz;
+    ElfProgramHeader *phdrs =
+        (ElfProgramHeader *)(elf_contents + e_header->phdrs_off);
 
-    for (u32 i = 0; i < e_header->shent_num; i++) {
-        ElfSectionHeader *s_hdr = &shdrs[i];
-        if (!(SHF_ALLOC & s_hdr->flags)) {
+    for (u32 i = 0; i < e_header->phent_num; i++) {
+        ElfProgramHeader *p_hdr = &phdrs[i];
+
+        // Only load segments marked as PT_LOAD (value 1)
+        if (p_hdr->type != 1) {
+            continue;
+        }
+
+        // If the segment occupies zero space in memory, skip it
+        if (p_hdr->mem_sz == 0) {
             continue;
         }
 
         Section *s = calloc(1, sizeof(Section));
         ARES_CHECK_OOM(s);
-        s->read = true;
-        s->align = s_hdr->align;
-        s->base = s_hdr->virt_addr;
-        s->contents.cap = s->contents.len = s_hdr->mem_sz;
+
+        s->name = "segment";  // Program headers don't have strings/names
+                              // associated with them
+        s->read = (p_hdr->flags & 4) ? true : false;     // PF_R = 0x4
+        s->write = (p_hdr->flags & 2) ? true : false;    // PF_W = 0x2
+        s->execute = (p_hdr->flags & 1) ? true : false;  // PF_X = 0x1
+
+        s->align = p_hdr->align;
+        s->base = p_hdr->virt_addr;
+        s->contents.cap = s->contents.len = p_hdr->mem_sz;
         s->contents.buf = calloc(1, s->contents.len);
         ARES_CHECK_OOM(s->contents.buf);
-        if (s_hdr->type != SHT_NOBITS) 
-            memcpy(s->contents.buf, elf_contents + s_hdr->off, s->contents.len);
-        
+
+        // Copy data up to filesz; the remaining space up to memsz is left as
+        // zero (BSS)
+        if (p_hdr->file_sz > 0) {
+            if (p_hdr->off + p_hdr->file_sz > elf_len) {
+                *error = "segment file offset out of bounds";
+                free(s->contents.buf);
+                free(s);
+                goto fail;
+            }
+            memcpy(s->contents.buf, elf_contents + p_hdr->off, p_hdr->file_sz);
+        }
+
         s->limit = s->base + s->contents.len;
-
-        if (s_hdr->name_off >= str_tab_len) {
-            *error = "section header name offset out of range";
-            free(s);
-            goto fail;
-        }
-
-        s->name = str_tab + s_hdr->name_off;
-
-        if (SHF_WRITE & s_hdr->flags) {
-            s->write = true;
-        }
-
-        if (SHF_EXECINSTR & s_hdr->flags) {
-            s->execute = true;
-        }
 
         *ARES_ARRAY_PUSH(&g_sections) = s;
     }
@@ -905,7 +914,11 @@ bool elf_load(u8 *elf_contents, size_t elf_len, char **error) {
 
 fail:
     for (size_t i = 0; i < ARES_ARRAY_LEN(&g_sections); i++) {
-        free(*ARES_ARRAY_GET(&g_sections, i));
+        Section *s = *ARES_ARRAY_GET(&g_sections, i);
+        if (s) {
+            free(s->contents.buf);
+            free(s);
+        }
     }
     ARES_ARRAY_FREE(&g_sections);
     return false;

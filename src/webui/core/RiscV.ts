@@ -44,6 +44,7 @@ interface WasmExports {
   g_get_addr_from_line_start: number;
   g_get_addr_from_line_end: number;
   emu_load: (addr: number, size: number) => number;
+  emu_disassemble: (addr: number) => number;
   emu_disassemble_addr: (addr: number) => number;
   __heap_base: number;
   g_regs: number;

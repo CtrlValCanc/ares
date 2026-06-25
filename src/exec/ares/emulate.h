@@ -37,6 +37,11 @@
 extern export u32 g_regs[32];
 extern export u32 g_csr[4096];
 extern export u32 g_pc;
+extern export u32 g_cache_enabled;
+extern export u32 g_cache_hits;
+extern export u32 g_cache_misses;
+extern export u64 g_icache_lookups;
+extern export u64 g_icache_crossline_fetches;
 
 extern export u32 g_runtime_error_params[2];
 extern export Error g_runtime_error_type;
@@ -48,6 +53,10 @@ void emulator_enter_kernel(void);
 void emulator_leave_kernel(void);
 u32 LOAD(u32 addr, int size, bool *err);
 void STORE(u32 addr, u32 val, int size, bool *err);
+void cache_reset(void);
+bool cache_configure(u32 line_count, u32 line_size);
+bool cache_set_miss_penalty(u32 penalty);
+void cache_set_prefetch(bool enabled);
 void emulator_deliver_interrupt(u32 cause);
 void emulator_init(void);
 void emulator_interrupt_set_pending(u32 intno);

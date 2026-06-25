@@ -1049,6 +1049,7 @@ void test_load_store_api(void) {
     TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, val);
 }
 
+
 void test_kernel_memory_protection(void) {
     const char *prog = ".section .kernel_data\nvar: .word 0xCAFEBABE";
     assemble(prog, strlen(prog), false);
@@ -1399,9 +1400,9 @@ _start:                \n\
     ecall              \n\
 fun:                   \n\
     c.addi16sp sp, -16 \n\
-    c.swsp a0, 0(sp)   \n\
+    c.swsp a0, 0       \n\
     li a0, 123456      \n\
-    c.lwsp a0, 0(sp)   \n\
+    c.lwsp a0, 0       \n\
     c.addi16sp sp, 16  \n\
     c.jr ra            \n\
 ");

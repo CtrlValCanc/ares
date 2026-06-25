@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -149,6 +150,16 @@ static void emulate_safe(void) {
 
                 return;
         }
+    }
+
+    extern u64 g_cache_clock;
+    printf("clocks = %ld\n", g_cache_clock);
+    if (getenv("ARES_CACHE_STATS") != NULL) {
+        printf("cache_hits = %u\n", g_cache_hits);
+        printf("cache_misses = %u\n", g_cache_misses);
+        printf("icache_lookups = %" PRIu64 "\n", g_icache_lookups);
+        printf("icache_crossline_fetches = %" PRIu64 "\n",
+               g_icache_crossline_fetches);
     }
 
     return;
@@ -579,6 +590,23 @@ static void opt_sanitize(command_t *self) {
     callsan_init();
 }
 
+static void opt_cache_size(command_t *self) {
+    cache_configure(atoi(self->arg), 32);
+}
+
+static void opt_cache_miss_penalty(command_t *self) {
+    int penalty = atoi(self->arg);
+    if (penalty <= 0 || !cache_set_miss_penalty((u32)penalty)) {
+        fprintf(stderr, "cache miss penalty must be a positive integer\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void opt_no_prefetch(command_t *self) {
+    (void)self;
+    cache_set_prefetch(false);
+}
+
 int main(int argc, char **argv) {
     atexit(free_runtime);
     g_argc = argc;
@@ -612,6 +640,15 @@ int main(int argc, char **argv) {
                    opt_o);
     command_option(&cmd, "-s", "--sanitize", "enable ares sanitizers (callsan)",
                    opt_sanitize);
+    command_option(&cmd, NULL, "--cache-size <lines>",
+                   "number of lines in cache", opt_cache_size);
+    command_option(&cmd, NULL, "--cache-miss-penalty <cycles>",
+                   "logical cycles charged for an instruction-cache miss",
+                   opt_cache_miss_penalty);
+    command_option(&cmd, NULL, "--no-prefetch",
+                   "disable next-line instruction-cache prefetch",
+                   opt_no_prefetch);
+
     command_parse(&cmd, argc, argv);
     g_cmd_args = (const char **)cmd.argv;
     g_cmd_args_len = cmd.argc;

@@ -51,7 +51,7 @@ static inline u32 extr(u32 val, u32 end, u32 start) {
 #define TEXT_END 0x10000000
 #define DATA_BASE 0x10000000
 #define STACK_TOP 0x7FFFF000
-#define STACK_LEN 4096
+#define STACK_LEN (64 * 1024)
 #define DATA_END 0x70000000
 
 #define KERNEL_TEXT_BASE 0xFFF80000

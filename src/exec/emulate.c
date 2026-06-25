@@ -15,6 +15,14 @@ export u32 g_reg_written;
 export bool g_exited;
 export int g_exit_code;
 
+export u32 g_cache_enabled = 0;
+export u32 g_cache_hits;
+export u32 g_cache_misses;
+
+// Counters used to explain cache-line lookups caused by cross-line fetches.
+export u64 g_icache_lookups;
+export u64 g_icache_crossline_fetches;
+
 // u32 for WASM interop
 export u32 g_got_breakpoint;
 
@@ -22,6 +30,208 @@ extern u32 g_runtime_error_params[2];
 extern Error g_runtime_error_type;
 
 static int g_privilege_level = PRIV_USER;
+
+typedef struct CacheLine {
+    bool valid;
+    u32 tag;
+    u64 last_used;
+} CacheLine;
+
+static CacheLine *g_cache;
+u32 g_cache_line_count;
+static u32 g_cache_line_size = 32;
+static u32 g_cache_miss_penalty = 50;
+static bool g_cache_prefetch_enabled = true;
+u64 g_cache_clock;
+
+static u32 mem_read_raw(u8 *mem, int size) {
+    u32 ret = 0;
+    if (size == 1) {
+        ret = mem[0];
+    } else if (size == 2) {
+        ret = mem[0];
+        ret |= ((u32)mem[1]) << 8;
+    } else if (size == 4) {
+        ret = mem[0];
+        ret |= ((u32)mem[1]) << 8;
+        ret |= ((u32)mem[2]) << 16;
+        ret |= ((u32)mem[3]) << 24;
+    } else assert(!"Invalid size");
+    return ret;
+}
+
+static void mem_write_raw(u8 *mem, u32 val, int size) {
+    if (size == 1) {
+        mem[0] = val;
+    } else if (size == 2) {
+        mem[0] = val;
+        mem[1] = val >> 8;
+    } else if (size == 4) {
+        mem[0] = val;
+        mem[1] = val >> 8;
+        mem[2] = val >> 16;
+        mem[3] = val >> 24;
+    } else assert(!"Invalid size");
+}
+
+static u32 g_prefetch_line_addr;
+static bool g_prefetch_in_flight;
+static u64 g_prefetch_ready_at;
+
+void cache_reset(void) {
+    free(g_cache);
+    g_cache = NULL;
+
+    g_cache_clock = 0;
+    g_cache_hits = 0;
+    g_cache_misses = 0;
+
+    g_icache_lookups = 0;
+    g_icache_crossline_fetches = 0;
+
+    g_prefetch_in_flight = false;
+    g_prefetch_line_addr = 0;
+    g_prefetch_ready_at = 0;
+
+    if (!g_cache_enabled || g_cache_line_count == 0) return;
+
+    g_cache = calloc(g_cache_line_count, sizeof(CacheLine));
+}
+
+bool cache_configure(u32 line_count, u32 line_size) {
+    if (line_count == 0) return false;
+    if (line_size < 4) return false;
+    if ((line_size & (line_size - 1)) != 0) return false;
+
+    g_cache_enabled = true;
+    g_cache_line_count = line_count;
+    g_cache_line_size = line_size;
+
+    cache_reset();
+    return true;
+}
+
+bool cache_set_miss_penalty(u32 penalty) {
+    if (penalty == 0) return false;
+    g_cache_miss_penalty = penalty;
+    return true;
+}
+
+void cache_set_prefetch(bool enabled) {
+    g_cache_prefetch_enabled = enabled;
+    g_prefetch_in_flight = false;
+}
+
+static CacheLine *cache_lookup(u32 line_addr) {
+    for (u32 i = 0; i < g_cache_line_count; i++) {
+        CacheLine *line = &g_cache[i];
+        if (line->valid && line->tag == line_addr) {
+            line->last_used = ++g_cache_clock;
+            g_cache_hits++;
+            return line;
+        }
+    }
+    return NULL;
+}
+
+static CacheLine *cache_select_victim(void) {
+    assert(g_cache != NULL);
+    assert(g_cache_line_count > 0);
+
+    CacheLine *victim = &g_cache[0];
+    for (u32 i = 0; i < g_cache_line_count; i++) {
+        CacheLine *line = &g_cache[i];
+        if (!line->valid) return line;
+        if (line->last_used < victim->last_used) victim = line;
+    }
+    return victim;
+}
+
+static void cache_prefetch_fill(u32 line_addr) {
+    if (!g_cache_prefetch_enabled) return;
+    if (g_prefetch_in_flight && g_prefetch_line_addr == line_addr) return;
+    for (u32 i = 0; i < g_cache_line_count; i++) {
+        CacheLine *line = &g_cache[i];
+        if (line->valid && line->tag == line_addr) return;
+    }
+    g_prefetch_in_flight = true;
+    g_prefetch_line_addr = line_addr;
+    g_prefetch_ready_at = g_cache_clock + g_cache_miss_penalty;
+}
+
+static void cache_drain_prefetch(void) {
+    if (!g_prefetch_in_flight) return;
+    if (g_cache_clock < g_prefetch_ready_at) return;  // still in flight
+
+    // Slot the line in (evict LRU if needed, same as demand)
+    CacheLine *victim = cache_select_victim();
+    victim->valid = true;
+    victim->tag = g_prefetch_line_addr;
+    victim->last_used = g_prefetch_ready_at;  // use the ready time, not now,
+                                              // so it doesn't beat demand lines
+    g_prefetch_in_flight = false;
+}
+
+static CacheLine *cache_fill(u32 line_addr) {
+    g_cache_clock += g_cache_miss_penalty;
+
+    CacheLine *line = cache_select_victim();
+    line->valid = true;
+    line->tag = line_addr;
+    line->last_used = ++g_cache_clock;
+    g_cache_misses++;
+
+    cache_prefetch_fill(line_addr + g_cache_line_size);
+
+    return line;
+}
+
+static CacheLine *cache_get_line(u32 addr) {
+    u32 line_addr = addr & ~(g_cache_line_size - 1);
+
+    cache_drain_prefetch();
+
+    CacheLine *line = cache_lookup(line_addr);
+    if (line) {
+        cache_prefetch_fill(line_addr + g_cache_line_size);
+        return line;
+    }
+
+    if (g_prefetch_in_flight && g_prefetch_line_addr == line_addr) {
+        if (g_cache_clock < g_prefetch_ready_at)
+            g_cache_clock = g_prefetch_ready_at;
+        CacheLine *victim = cache_select_victim();
+        victim->valid = true;
+        victim->tag = line_addr;
+        victim->last_used = ++g_cache_clock;
+        g_cache_misses++;
+        g_prefetch_in_flight = false;
+
+        cache_prefetch_fill(line_addr + g_cache_line_size);
+        return victim;
+    }
+    return cache_fill(line_addr);
+}
+
+static void instruction_cache_fetch(u32 addr, int size) {
+    if (!g_cache_enabled) return;
+    if (g_cache == NULL) return;
+    if (g_cache_line_count == 0 || g_cache_line_size == 0) return;
+    if (size != 1 && size != 2 && size != 4) return;
+
+    u32 mask = g_cache_line_size - 1;
+    u32 first_line = addr & ~mask;
+    u32 last_line = (addr + (u32)size - 1) & ~mask;
+
+    g_icache_lookups++;
+    cache_get_line(addr);
+
+    if (last_line != first_line) {
+        g_icache_lookups++;
+        g_icache_crossline_fetches++;
+        cache_get_line(addr + (u32)size - 1);
+    }
+}
 
 static size_t i32_to_str(i32 val, char buf[12]);
 
@@ -180,18 +390,11 @@ void do_syscall(void) {
         for (size_t i = 0; i < len; i++) putchar(buffer[i]);
     } else if (g_regs[17] == 4) {
         // print string
-        // TODO: a common student bug is to use .ascii instead of .asciz/.string
-        // which may result in reading after the end of the data section
-        // currently it just returns the raw load error
         u32 i = 0;
         while (1) {
             bool err = false;
             u8 ch = LOAD(param + i, 1, &err);
-            if (err) {
-                g_runtime_error_type = ERROR_LOAD;
-                g_runtime_error_params[0] = param + i;
-                return;
-            }
+            if (err) return;  // TODO: return an error?
             if (ch == 0) break;
             i++;
             putchar(ch);
@@ -212,12 +415,34 @@ void do_syscall(void) {
         for (int i = 31; i >= 0; i--) {
             putchar(((param >> i) & 1) ? '1' : '0');
         }
+    } else if (g_regs[17] == 64) {
+        // Linux write(fd, buf, count). Ignore fd and report count written.
+        bool err = false;
+        for (u32 i = 0; i < g_regs[12]; i++) {
+            putchar(LOAD(g_regs[11] + i, 1, &err));
+            if (err) return;
+        }
+        g_regs[10] = g_regs[12];
+        g_reg_written = 10;
+    } else if (g_regs[17] == 9999) {
+        static int nframes = 0;
+        if (nframes == 0) {
+            g_cache_enabled = true;
+        } else if (nframes == 20) {
+            g_cache_clock = 0;
+        } else if (nframes == 21) {
+            emu_exit();
+        }
+        nframes++;
     } else if (g_regs[17] == 93 || g_regs[17] == 7 || g_regs[17] == 10) {
         emu_exit();
+    } else if (g_regs[17] == 95) {
+        cache_reset();
+    } else if (g_regs[17] == 96) {
+        g_cache_enabled = false;
     } else {
         g_runtime_error_params[0] = g_regs[17];
         g_runtime_error_type = ERROR_INVALID_ECALL;
-        return;
     }
 
     g_pc += 4;
@@ -609,6 +834,7 @@ void emulate(void) {
 
     // compressed instructions are 16-bit and must be handled separately
     if ((halfword & 0b11) != 0b11) {
+        instruction_cache_fetch(g_pc, 2);
         if (!emulate_compressed((u16)halfword)) {
             g_runtime_error_params[0] = g_pc;
             g_runtime_error_type = ERROR_UNHANDLED_INSN;
@@ -622,6 +848,7 @@ void emulate(void) {
         g_runtime_error_type = ERROR_FETCH;
         return;
     }
+    instruction_cache_fetch(g_pc, 4);
 
     u32 rd = extr(inst, 11, 7);
     u32 rs1 = extr(inst, 19, 15);
@@ -1179,7 +1406,6 @@ size_t disassemble(u32 inst, char *buf, size_t buflen) {
                 APPEND_REG(extr(cinst, 11, 7));
                 APPEND_STR(", ");
                 APPEND_U32(c_lwsp_off(cinst));
-                APPEND_STR("(sp)");
                 goto done;
             }
             if (cfunct3 == 0b100) {
@@ -1229,7 +1455,6 @@ size_t disassemble(u32 inst, char *buf, size_t buflen) {
                 APPEND_REG(extr(cinst, 6, 2));
                 APPEND_STR(", ");
                 APPEND_U32(c_swsp_off(cinst));
-                APPEND_STR("(sp)");
                 goto done;
             }
         }
@@ -1505,6 +1730,10 @@ u32 emu_load(u32 addr, int size) {
 
 char g_emu_disassemble_buf[64];
 
+size_t emu_disassemble(u32 inst) {
+    return disassemble(inst, g_emu_disassemble_buf, 64);
+}
+
 size_t emu_disassemble_addr(u32 addr) {
     bool err = false;
     u32 inst = LOAD(addr, 2, &err);
@@ -1569,6 +1798,7 @@ void emulator_deliver_interrupt(u32 cause) {
 void emulator_init(void) {
     g_exited = false;
     g_exit_code = 0;
+    cache_reset();
 
     memset(g_regs, 0, sizeof(g_regs));
     g_pc = TEXT_BASE;

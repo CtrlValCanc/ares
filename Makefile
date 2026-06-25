@@ -14,14 +14,13 @@ LIBEZLD = src/exec/ezld/bin/libezld.a
 
 BIN_DIR = bin
 TARGETS = $(BIN_DIR)/ares $(BIN_DIR)/ares_afl $(BIN_DIR)/ares_libfuzzer $(BIN_DIR)/ares_test
-
 all: $(BIN_DIR)/ares
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
 $(BIN_DIR)/ares: $(SRC) $(LIBEZLD) | $(BIN_DIR)
-	$(CC) $(CFLAGS) $(ARES_FLAGS) $(SRC) $(LIBEZLD) -o $@
+	$(CC) $(CFLAGS) $(ARES_FLAGS) $(SRC) $(LIBEZLD) -flto -O3 -o $@
 
 $(BIN_DIR)/ares_afl: $(AFLSRC) $(LIBEZLD) | $(BIN_DIR)
 	$(AFL_CC) $(CFLAGS) $(AFL_FLAGS) $(AFLSRC) $(LIBEZLD) -o $@
@@ -51,6 +50,5 @@ $(LIBEZLD):
 
 clean:
 	rm -f $(BIN_DIR)/ares $(BIN_DIR)/ares_afl $(BIN_DIR)/ares_libfuzzer $(BIN_DIR)/ares_test $(BIN_DIR)/ares_test_cov
-	cd src/exec/ezld && make clean
 
 .PHONY: clean test_coverage all
