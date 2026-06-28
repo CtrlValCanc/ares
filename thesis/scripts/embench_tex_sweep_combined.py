@@ -14,15 +14,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]      # .../ares/thesis
+ARES_ROOT = ROOT.parent                         # .../ares
 
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ARES_PREFETCH = ROOT / "ares" / "bin" / "ares"
+DEFAULT_ARES_PREFETCH = ARES_ROOT / "bin" / "ares"
 DEFAULT_EMBENCH = ROOT / "embench-iot"
 DEFAULT_DOOM = ROOT / "doomgeneric" / "doomgeneric"
 DEFAULT_DATA_DIR = ROOT / "data"
 SWEEP = ROOT / "scripts" / "ares_cache_sweep.py"
-LINE_SIZE_BYTES = 32
 
+LINE_SIZE_BYTES = 32
 
 def display_path(path: Path) -> Path:
     try:

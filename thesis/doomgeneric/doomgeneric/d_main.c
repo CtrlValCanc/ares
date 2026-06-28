@@ -404,7 +404,7 @@ boolean D_GrabMouseCallback(void)
 }
 
 
-
+#ifdef __riscv
 static inline int sys_display(void* fb) {
     register int a7 asm("a7") = 9999;    // openat
     register void* a0 asm("a0") = fb;
@@ -418,7 +418,7 @@ static inline int sys_display(void* fb) {
     );
     return res;
 }
-
+#endif
 
 void doomgeneric_Tick()
 {
@@ -434,8 +434,9 @@ void doomgeneric_Tick()
     {
         D_Display ();
     }
-
+#ifdef __riscv
     sys_display(DG_ScreenBuffer);
+#endif
 }
 
 //

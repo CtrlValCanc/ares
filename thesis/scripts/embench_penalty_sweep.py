@@ -10,10 +10,12 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]      # .../ares/thesis
+ARES_ROOT = ROOT.parent                         # .../ares
 
-ROOT = Path(__file__).resolve().parents[1]
+LINE_SIZE_BYTES = 32
 SWEEP = ROOT / "scripts" / "ares_cache_sweep.py"
-DEFAULT_ARES = ROOT / "ares" / "bin" / "ares"
+DEFAULT_ARES = ARES_ROOT  / "bin" / "ares"
 DEFAULT_EMBENCH = ROOT / "embench-iot"
 DEFAULT_OUTPUT_DIR = ROOT / "data" / "penalty_sweeps"
 LINE_SIZE_BYTES = 32

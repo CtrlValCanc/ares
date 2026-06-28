@@ -4,7 +4,7 @@ This repository contains the code and scripts used to reproduce the instruction-
 
 ## Repository contents
 
-- `ares/`: modified ARES emulator and cache model.
+- `../src/exec/`: modified ARES emulator and instruction-cache model.
 - `embench-iot/`: Embench sources and RV32IM/RV32IMC builds.
 - `doomgeneric/`: DoomGeneric case study and its two RISC-V builds.
 - `scripts/`: experiment drivers and table-generation utilities.
@@ -15,6 +15,7 @@ This repository contains the code and scripts used to reproduce the instruction-
 The reproducibility workflow requires these scripts:
 
 - `scripts/ares_cache_sweep.py`: low-level runner for one RV32IM/RV32IMC cache sweep.
+- `scripts/generate_embench_icache_sweep.py`: regenerates the complete Embench instruction-cache dataset.
 - `scripts/embench_tex_sweep_combined.py`: generates the four curves used in the thesis: RV32IM and RV32IMC, with and without prefetch, using one ARES executable.
 - `scripts/run_sweeps_combined.sh`: runs the combined sweep for all representative benchmarks and Doom.
 - `scripts/embench_penalty_sweep.py`: reproduces the miss-penalty sensitivity experiment for `nettle-sha256`.
@@ -101,6 +102,26 @@ doomgeneric/doomgeneric/doom_rvc
 The object directories are architecture-specific, so the two builds can
 coexist. `doom1.wad` is runtime game data and is not linked into either ELF.
 
+### Run DoomGeneric graphically
+
+The SDL port can be built and run natively to check the Doom workload
+graphically. Install the SDL2 and SDL2_mixer development packages, then run
+these commands from the `thesis/` directory:
+
+```bash
+cd doomgeneric/doomgeneric
+make -f Makefile.sdl \
+  OBJDIR=build-sdl \
+  OUTPUT=doomgeneric-sdl
+./doomgeneric-sdl -iwad doom1.wad -warp 1 1
+```
+
+Controls:
+
+- Arrow keys: move forward/backward and turn left/right
+- Ctrl: fire
+- Space: use or open
+
 ## Reproduce the experiments
 
 Run the following commands from the `thesis/` directory. First build ARES,
@@ -118,6 +139,36 @@ directories:
 ```bash
 python3 scripts/embench_tex_sweep_combined.py --list
 ```
+
+### Regenerate the Table 5.4 dataset
+
+`generate_embench_icache_sweep.py` runs all 18 Embench programs analyzed in
+Chapter 5 for both RV32IM and RV32IMC. By default it tests caches containing 1,
+2, 4, 8, 16, and 32 lines of 32 bytes each:
+
+```bash
+python3 scripts/generate_embench_icache_sweep.py
+```
+
+The script uses all available CPUs by default and writes:
+
+```text
+LaTex/data/embench_icache_sweep.csv
+```
+
+Each row contains the benchmark, cache size in lines and bytes, ISA, clock
+count, hits, and misses. Use `--jobs` to limit concurrency. For a quick check,
+select one or more benchmarks and a smaller set of cache sizes:
+
+```bash
+python3 scripts/generate_embench_icache_sweep.py \
+  --benchmark statemate \
+  --cache-lines 1 2 \
+  --jobs 2
+```
+
+Repeat `--benchmark` to select multiple programs. `--output`, `--timeout`,
+`--ares`, and `--embench` can be used to override the remaining defaults.
 
 ### Run one combined cache sweep
 
@@ -177,6 +228,7 @@ useful for custom programs or debugging:
 
 ```bash
 python3 scripts/ares_cache_sweep.py \
+  --ares ../bin/ares \
   --rv32 embench-iot/bd/src/statemate/statemate \
   --rv32c embench-iot/bd_rvc/src/statemate/statemate \
   --start 3 --stop 80 --step 3 \
