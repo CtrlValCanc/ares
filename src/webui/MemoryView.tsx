@@ -8,7 +8,7 @@ import { ShadowStack } from "./ShadowStack";
 
 const MEMORY_WINDOW_SIZE = 65536;
 
-function loadWrapper(load: (addr: number, pow: number) => number, ptr: number, size: number) {
+function loadWrapper(load: (addr: number, size: number) => number, ptr: number, size: number) {
     let val = 0;
     for (let i = 0; i < size; i++) {
         val |= load(ptr + i, 1) << (i * 8);
@@ -22,12 +22,10 @@ const AddressGutter: Component<{
     charWidth: number,
     addrSelect: number,
     setAddrSelect: (s: number) => void,
-    highlighted?: boolean,
 }> = (props) => (
     <div
-        class={"theme-style6 shrink-0 w-[10ch] tabular-nums " +
-            (props.addrSelect === props.index ? "select-text " : "select-none ") +
-            (props.highlighted ? "theme-fg" : "theme-fg2")}
+        class={"text-addrcolumn shrink-0 w-[10ch] tabular-nums " +
+            (props.addrSelect === props.index ? "select-text " : "select-none ")}
         onMouseDown={(e) => { props.setAddrSelect(props.index); e.stopPropagation(); }}
     >
         {props.addr.toString(16).padStart(8, "0")}
@@ -44,10 +42,24 @@ const DisasmView: Component<{
     addrSelect: () => number,
     setAddrSelect: (i: number) => void,
     disassemble: (pc: number) => string | null,
+    load: (addr: number, size: number) => number,
     parentRef: HTMLDivElement | undefined,
 }> = (props) => {
+    // TODO: compute this C-side instead?
+    const addresses = createMemo(() => {
+        props.version(); // reactive hook for code change
+        const addrs: number[] = [];
+        let addr = TEXT_BASE;
+        const end = TEXT_BASE + MEMORY_WINDOW_SIZE;
+        while (addr < end) {
+            addrs.push(addr);
+            addr += (props.load(addr, 1) & 0x3) === 0x3 ? 4 : 2;
+        }
+        return addrs;
+    });
+
     const virtualizer = createVirtualizer({
-        get count() { return MEMORY_WINDOW_SIZE / 4; },
+        get count() { return addresses().length; },
         getScrollElement: () => props.parentRef ?? null,
         estimateSize: () => props.charHeight,
         overscan: 5,
@@ -55,8 +67,16 @@ const DisasmView: Component<{
 
     createEffect(() => {
         if (props.pc > 0) {
-            const idx = (props.pc - TEXT_BASE) / 4;
-            if (idx >= 0 && idx < MEMORY_WINDOW_SIZE / 4) {
+            // binary search to get the line from PC
+            const addrs = addresses();
+            let lo = 0, hi = addrs.length - 1, idx = -1;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                if (addrs[mid] === props.pc) { idx = mid; break; }
+                else if (addrs[mid] < props.pc) lo = mid + 1;
+                else hi = mid - 1;
+            }
+            if (idx >= 0) {
                 virtualizer.scrollToIndex(idx, { align: "center" });
             }
         }
@@ -66,11 +86,11 @@ const DisasmView: Component<{
         <div style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
             <For each={virtualizer.getVirtualItems()}>
                 {(virtRow) => {
-                    const addr = TEXT_BASE + virtRow.index * 4;
+                    const addr = addresses()[virtRow.index];
                     return (
                         <div
                             style={{ "white-space": "nowrap", position: "absolute", top: `${virtRow.start}px`, height: `${virtRow.size}px` }}
-                            class={"flex flex-row items-center w-full " + (addr === props.pc ? "cm-debugging" : "")}
+                            class={"flex flex-row items-center w-full " + (addr === props.pc ? "bg-debugging" : "")}
                         >
                             <AddressGutter
                                 index={virtRow.index}
@@ -78,7 +98,6 @@ const DisasmView: Component<{
                                 charWidth={props.charWidth}
                                 addrSelect={props.addrSelect()}
                                 setAddrSelect={props.setAddrSelect}
-                                highlighted={addr === props.pc}
                             />
                             {(() => {
                                 // trigger reactivity when the code changes
@@ -104,7 +123,7 @@ const HexView: Component<{
     highlightLen: number,
     sp: number,
     fp: number,
-    load: (addr: number, pow: number) => number,
+    load: (addr: number, size: number) => number,
     charWidth: number,
     charHeight: number,
     addrSelect: () => number,
@@ -169,8 +188,8 @@ const HexView: Component<{
         const isFp = isStack && ptr >= props.fp && ptr < props.fp + 4;
         let style = selectMode;
         if (isGray) style = "theme-fg2";
-        else if (isSp) style = "sp-highlight";
-        else if (isFp) style = "fp-highlight";
+        else if (isSp) style = "bg-sp-highlight";
+        else if (isFp) style = "bg-fp-highlight";
         if (ptr >= highlightStartAligned && ptr < highlightEndAligned)
             style += " font-bold";
         if (isAnimated) style += " animate-fade-highlight";
@@ -245,7 +264,7 @@ export const MemoryView: Component<{
     pc: number,
     sp: number,
     fp: number,
-    load: (addr: number, pow: number) => number,
+    load: (addr: number, size: number) => number,
     shadowStack: any,
     disassemble: (pc: number) => string | null
 }> = (props) => {
@@ -298,7 +317,7 @@ export const MemoryView: Component<{
             <TabSelector tab={activeTab()} setTab={setActiveTab} tabs={[".text", "disasm", ".data", "stack", "frames"]} />
 
             <div class="font-semibold theme-mono ml-2 theme-fg">
-                <span class="theme-style6 inline-block" style={{ width: charWidth() * 10 + "px" }}>address</span>
+                <span class="text-addrcolumn inline-block" style={{ width: charWidth() * 10 + "px" }}>address</span>
                 <span>{activeTab() === "disasm" ? "instructions" : "contents"}</span>
             </div>
 
@@ -325,6 +344,7 @@ export const MemoryView: Component<{
                         setAddrSelect={setAddrSelect}
                         disassemble={props.disassemble}
                         parentRef={parentRef()}
+                        load={props.load}
                     />
                 </Show>
 
